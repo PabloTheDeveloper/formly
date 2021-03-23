@@ -7,4 +7,4 @@ No current way of installing.
 
 
 ## License
-[MIT](LICENSE.txt)
+[MIT](LICENSE)
