@@ -7,7 +7,15 @@ import (
 	"os"
 )
 
+var data *Data
+
 func main() {
+	data = &Data{map[string]Ksat{}}
+	err := getData()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 	cmd, err := getCommand(os.Args)
 	if err != nil {
 		fmt.Println(err)
@@ -39,8 +47,31 @@ func execCommand(cmd string) (string, error) {
 	switch cmd {
 	case "", "-h", "--help":
 		return "there are four commands: read, create, update, delete", nil
-	case "read":
+	case "commands":
+		fmt.Println("Commands:")
+		for k := range data.Ksats {
+			fmt.Println(k)
+		}
 		return "", nil
+	case "read":
+		fmt.Println("Commands:")
+		for k := range data.Ksats {
+			fmt.Println(k)
+		}
+		scanner := bufio.NewScanner(os.Stdin)
+		cmd := input("enter command:", scanner)
+		entries := dbReadEntries(cmd)
+		if len(entries) == 0 {
+			return "no ksat entries or ksat command", errors.New("no file")
+		}
+
+		for _, entry := range entries {
+			for _, pair := range entry.InputPairs {
+				fmt.Println(pair[0] + ":")
+				fmt.Println(pair[1] + "\n")
+			}
+		}
+
 	case "create":
 		ksat, err := promptKsat()
 		if err != nil {
@@ -49,39 +80,13 @@ func execCommand(cmd string) (string, error) {
 		if err := dbCreateKsat(ksat); err != nil {
 			return "Error in db creation of ksat", err
 		}
-	case "update":
-		return "", nil
-	case "delete":
-		return "", nil
 	default:
 		// fetch commands and check if valid
-		return "", errors.New("Command not found")
+		ksat, ok := data.Ksats[cmd]
+		if !ok {
+			return "", errors.New("Command not found")
+		}
+		executeKsat(ksat)
 	}
 	return "", nil
-}
-
-// Ksat contains task information
-type Ksat struct {
-	identifier string
-	prompt     string
-	label      string
-}
-
-func promptKsat() (ksat Ksat, err error) {
-	scanner := bufio.NewScanner(os.Stdin)
-	ksat.identifier = input("Enter command identifier: ", scanner)
-	ksat.prompt = input("Enter prompt:\n", scanner)
-	ksat.label = input("Enter input label: ", scanner)
-	return ksat, nil
-}
-
-func input(prompt string, scanner *bufio.Scanner) string {
-	fmt.Print(prompt)
-	scanner.Scan()
-	return scanner.Text()
-}
-
-func dbCreateKsat(ksat Ksat) error {
-	// TODO
-	return nil
 }
