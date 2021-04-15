@@ -28,14 +28,15 @@ func createDB(clearPrior bool) error {
 			ksat_id INTEGER PRIMARY KEY AUTOINCREMENT,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			name TEXT UNIQUE NOT NULL,
-			description TEXT NOT NULL,
-			CHECK(length(name) > 1 AND length(name) < 7 AND length(description) > 5)
+			usage TEXT NOT NULL,
+			CHECK(length(name) >= 1 AND length(name) <= 6 AND length(usage) >= 5 AND length(usage) <= 40)
 		);
 
 		CREATE TABLE IF NOT EXISTS prompts (
 			prompt_id INTEGER PRIMARY KEY AUTOINCREMENT,
-			sequence INTEGER NOT NULL CHECK(sequence > -1),
-			label TEXT NOT NULL CHECK(length(label) > 0 AND length(label) < 7),
+			sequence INTEGER NOT NULL CHECK(sequence >= 0),
+			flag TEXT NOT NULL CHECK(length(flag) >= 1 AND length(flag) <= 10),
+			usage TEXT NOT NULL CHECK(length(usage) >= 5 AND length(usage) <= 40),
 			input_type TEXT CHECK(input_type IN ('str','num','flt','time', 'audio', 'video', 'path', 'binary')) NOT NULL DEFAULT 'str',
 			ksat_id INTEGER NOT NULL,
 			FOREIGN KEY (ksat_id) REFERENCES ksats (ksat_id) ON UPDATE CASCADE ON DELETE CASCADE

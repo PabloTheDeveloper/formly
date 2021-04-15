@@ -9,37 +9,6 @@ import (
 type ksat struct {
 	id                int64
 	name, description string
-	schedule          schedule
-	prompts           []prompt
-	sessions          []session
-}
-type prompt struct {
-	id               int64
-	label, inputType string
-}
-type schedule struct {
-	id         int64
-	once       string
-	selected   bool
-	reccurings []reccuring
-}
-type reccuring struct {
-	day  int64
-	hour int
-	min  int
-}
-type session struct {
-	id        int64
-	createdAt string
-	entries   []entry
-}
-type entry struct {
-	id               int64
-	label, inputType string
-	txt              string
-	integer          int
-	flt              float64
-	bin              []byte
 }
 
 func getKsatIdByName(name string) (ksatId int64, err error) {
@@ -53,24 +22,33 @@ func getKsatIdByName(name string) (ksatId int64, err error) {
 	}
 	return
 }
-func newKsat(name, description string) (ksat, error) {
-	if len(name) <= 1 || len(name) >= 7 {
-		return ksat{}, errors.New("'name' must be between 1-6 characters long")
+func newKsat(name, usage, schedule, prompts string) error {
+	if !(len(name) >= 1 && len(name) <= 6) {
+		return errors.New("'name' must be between 1-6 characters long")
 	}
-	if len(description) <= 5 {
-		return ksat{}, errors.New("'desc' must be larger than 5 characters long")
+	if !(len(usage) >= 5 && len(usage) <= 40) {
+		return errors.New("'usage' must be between 5-40 characters")
 	}
-	stmt, err := db.Prepare("INSERT INTO ksats (name, description) VALUES(?, ?)")
+	ksatId, err := getKsatIdByName(name)
+	if err != nil {
+		return err
+	}
+	if ksatId != -1 {
+		return errors.New("ksat already exists")
+	}
+	// TODO parse prompts
+	stmt, err := db.Prepare("INSERT INTO ksats (name, usage) VALUES (?, ?)")
+
 	if err != nil {
 		log.Fatal(err)
 	}
-	res, err := stmt.Exec(name, description)
+	res, err := stmt.Exec(name, usage)
 	if err != nil {
 		log.Fatal(err)
 	}
-	lastId, err := res.LastInsertId()
+	_, err = res.LastInsertId()
 	if err != nil {
 		log.Fatal(err)
 	}
-	return ksat{lastId, name, description, schedule{}, nil, nil}, nil
+	return nil
 }
