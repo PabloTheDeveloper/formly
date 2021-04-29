@@ -22,7 +22,7 @@ func getKsatIdByName(name string) (ksatId int64, err error) {
 	}
 	return
 }
-func newKsat(name, usage, schedule, prompts string) error {
+func newKsat(name, usage, prompts string) error {
 	if !(len(name) >= 1 && len(name) <= 6) {
 		return errors.New("'name' must be between 1-6 characters long")
 	}

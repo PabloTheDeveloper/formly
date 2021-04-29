@@ -10,17 +10,7 @@ import (
 
 var db *sql.DB
 
-func createDB(clearPrior bool) error {
-	if clearPrior {
-		_, err := db.Exec(`
-			DROP TABLE IF EXISTS ksats;
-			DROP TABLE IF EXISTS prompts;
-			DROP TABLE IF EXISTS entries;
-		`)
-		if err != nil {
-			return err
-		}
-	}
+func createDB() error {
 	_, err := db.Exec(`
 		PRAGMA foreign_keys = ON;
 
@@ -37,32 +27,8 @@ func createDB(clearPrior bool) error {
 			sequence INTEGER NOT NULL CHECK(sequence >= 0),
 			flag TEXT NOT NULL CHECK(length(flag) >= 1 AND length(flag) <= 10),
 			usage TEXT NOT NULL CHECK(length(usage) >= 5 AND length(usage) <= 40),
-			input_type TEXT CHECK(input_type IN ('str','num','flt','time', 'audio', 'video', 'path', 'binary')) NOT NULL DEFAULT 'str',
 			ksat_id INTEGER NOT NULL,
 			FOREIGN KEY (ksat_id) REFERENCES ksats (ksat_id) ON UPDATE CASCADE ON DELETE CASCADE
-		);
-
-		CREATE TABLE IF NOT EXISTS schedules (
-			schedule_id INTEGER PRIMARY KEY AUTOINCREMENT,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			once DATETIME,
-			selected INTEGER NOT NULL,
-			ksat_id INTEGER NOT NULL,
-			FOREIGN KEY (ksat_id) REFERENCES ksats (ksat_id)
-		);
-
-		CREATE TABLE IF NOT EXISTS recurrings (
-			recurring_id INTEGER PRIMARY KEY AUTOINCREMENT,
-			day TEXT CHECK(day in ('mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun')) DEFAULT 'sun',
-			hour INTEGER CHECK(hour < 25 AND hour > -2),
-			min INTEGER CHECK(min < 25 AND min > -2)
-		);
-
-		CREATE TABLE IF NOT EXISTS schedules_recurrings (
-			schedule_id INTEGER NOT NULL,
-			recurring_id INTEGER NOT NULL,
-			FOREIGN KEY (schedule_id) REFERENCES schedules (schedule_id),
-			FOREIGN KEY (recurring_id) REFERENCES recurrings (recurring_id)
 		);
 
 		CREATE TABLE IF NOT EXISTS sessions (
@@ -77,11 +43,7 @@ func createDB(clearPrior bool) error {
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			sequence INTEGER NOT NULL CHECK(sequence > -1),
 			label TEXT NOT NULL CHECK(length(label) > 0),
-			input_type TEXT CHECK(input_type IN ('str','num','flt','time', 'audio', 'video', 'path', 'binary')) NOT NULL DEFAULT 'str',
 			txt TEXT,
-			int INTEGER,
-			flt FLOAT,
-			bin BLOB,
 			session_id INTEGER NOT NULL,
 			FOREIGN KEY (session_id) REFERENCES sessions (session_id) ON UPDATE CASCADE ON DELETE CASCADE
 		);
@@ -102,12 +64,16 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := createDB(true); err != nil {
+	if err := createDB(); err != nil {
 		log.Fatal(err)
 	}
-	if err := execute(); err != nil {
+	cmdSet := loadCommandSet()
+	args, err := parseTopLevelFlags(cmdSet)
+	if err != nil {
 		log.Fatal(err)
 	}
-
+	if err := parseCommands(cmdSet, args); err != nil {
+		log.Fatal(err)
+	}
 	defer db.Close()
 }

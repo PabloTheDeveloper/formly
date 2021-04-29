@@ -18,7 +18,7 @@ func setUp() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	err = createDB(true)
+	err = createDB()
 	return dir, err
 }
 
