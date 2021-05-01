@@ -67,13 +67,5 @@ func main() {
 	if err := createDB(); err != nil {
 		log.Fatal(err)
 	}
-	cmdSet := loadCommandSet()
-	args, err := parseTopLevelFlags(cmdSet)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if err := parseCommands(cmdSet, args); err != nil {
-		log.Fatal(err)
-	}
 	defer db.Close()
 }

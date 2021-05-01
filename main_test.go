@@ -12,14 +12,38 @@ import (
 func setUp() (string, error) {
 	dir, err := ioutil.TempDir("", "testDir-*")
 	if err != nil {
-		return "", err
+		return dir, err
 	}
 	db, err = sql.Open("sqlite3", filepath.Join(dir, "data.db"))
 	if err != nil {
-		return "", err
+		return dir, err
 	}
-	err = createDB()
-	return dir, err
+	if err := createDB(); err != nil {
+		return dir, err
+	}
+	/*
+		Creating ksats in db for testing
+	*/
+	createKsatStmt, err := db.Prepare("INSERT INTO ksats (name, usage) VALUES (?, ?)")
+	if err != nil {
+		return dir, err
+	}
+	ksats := []ksat{
+		ksat{
+			name:  "first",
+			usage: "some usage",
+		},
+		ksat{
+			name:  "second",
+			usage: "some more usage",
+		},
+	}
+	for _, task := range ksats {
+		if _, err := createKsatStmt.Exec(task.name, task.usage); err != nil {
+			return dir, err
+		}
+	}
+	return dir, nil
 }
 
 func tearDown(dir string) error {

@@ -1,55 +1,193 @@
 package main
 
-import (
-	"errors"
-	"testing"
-)
+import "testing"
 
-func TestNewKsat(t *testing.T) {
-	nameBoundsErr := errors.New("'name' must be between 1-6 characters long")
-	validUsageStr := "some usage"
-	validPrompt := "some prompt"
-	newKsatCases := []struct {
-		desc                 string
-		name, usage, prompts string
-		expected             error
+func TestIsWordValid(t *testing.T) {
+	cases := []struct {
+		desc     string
+		word     string
+		expected error
 	}{
 		{
-			"testing invalid ksat name (too low)",
+			"ZeroLetterWord",
 			"",
-			validUsageStr,
-			validPrompt,
-			nameBoundsErr,
+			wordErr{word: ""},
 		},
 		{
-			"testing valid ksat name (lowest inclusion point)",
-			"o",
-			validUsageStr,
-			validPrompt,
+			"OneLetterWord",
+			"a",
 			nil,
 		},
 		{
-			"testing valid ksat name (highest inclusion point)",
-			"onesix",
-			validUsageStr,
-			validPrompt,
+			"MultipleLetterWord",
+			"abc",
 			nil,
 		},
 		{
-			"testing invalid ksat name (too high)",
-			"onesix7",
-			validUsageStr,
-			validPrompt,
-			nameBoundsErr,
+			"WordWithNumberAndLetters",
+			"a12b",
+			wordErr{word: "a12b"},
 		},
 	}
-
-	for _, tc := range newKsatCases {
+	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			err := newKsat(tc.name, tc.usage, tc.prompts)
-
-			if nameBoundsErr != err {
-				t.Fatalf("errors don't match, %v, %v", err, tc.expected)
+			if ret := isWordValid(tc.word); ret != tc.expected {
+				t.Fatalf("errors don't match: %v, %v", ret, tc.expected)
+			}
+		})
+	}
+}
+func TestIsKsatNameValid(t *testing.T) {
+	cases := []struct {
+		desc     string
+		name     string
+		expected error
+	}{
+		{
+			"ZeroLetterWord",
+			"",
+			ksatNameErr{name: ""},
+		},
+		{
+			"OneLetterWord",
+			"a",
+			nil,
+		},
+		{
+			"MultipleLetterWord",
+			"abc",
+			nil,
+		},
+		{
+			"SixLetterWord",
+			"sixsix",
+			nil,
+		},
+		{
+			"SevenLetterWord",
+			"sevsevs",
+			ksatNameErr{name: "sevsevs"},
+		},
+		{
+			"WordWithNumberAndLetters",
+			"a12b",
+			wordErr{word: "a12b"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.desc, func(t *testing.T) {
+			if ret := isKsatNameValid(tc.name); ret != tc.expected {
+				t.Fatalf("errors don't match: %v, %v", ret, tc.expected)
+			}
+		})
+	}
+}
+func TestIsKsatUsageValid(t *testing.T) {
+	cases := []struct {
+		desc     string
+		usage    string
+		expected error
+	}{
+		{
+			"ZeroLetterUsage",
+			"",
+			ksatUsageErr{usage: ""},
+		},
+		{
+			"FourLetterUsage",
+			"abcd",
+			ksatUsageErr{usage: "abcd"},
+		},
+		{
+			"FiveLetterUsage",
+			"abcde",
+			nil,
+		},
+		{
+			"SixLetterUsage",
+			"sixsix",
+			nil,
+		},
+		{
+			"FourtyLetterUsage",
+			"0123456789" +
+				"0123456789" +
+				"0123456789" +
+				"0123456789",
+			nil,
+		},
+		{
+			"FourtyOneLetterUsage",
+			"0123456789" +
+				"0123456789" +
+				"0123456789" +
+				"0123456789" + "1",
+			ksatUsageErr{
+				usage: "0123456789" +
+					"0123456789" +
+					"0123456789" +
+					"0123456789" + "1"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.desc, func(t *testing.T) {
+			if ret := isKsatUsageValid(tc.usage); ret != tc.expected {
+				t.Fatalf("errors don't match: %v, %v", ret, tc.expected)
+			}
+		})
+	}
+}
+func TestValidate(t *testing.T) {
+	cases := []struct {
+		desc     string
+		task     ksat
+		expected error
+	}{
+		{
+			"ZeroLetterInvalidNameValidUsage",
+			ksat{name: "", usage: "some usage"},
+			ksatNameErr{name: ""},
+		},
+		{
+			"ZeroLetterInvalidUsageValidName",
+			ksat{name: "aName", usage: ""},
+			ksatUsageErr{usage: ""},
+		},
+		{
+			"FourLetterInvalidUsageValidName",
+			ksat{name: "aName", usage: "abcd"},
+			ksatUsageErr{usage: "abcd"},
+		},
+		{
+			"SixLetterValidUsageSixLetterValidName",
+			ksat{name: "sixsix", usage: "sixsix"},
+			nil,
+		},
+		{
+			"FourtyLetterUsageValidName",
+			ksat{name: "aName", usage: "0123456789" +
+				"0123456789" +
+				"0123456789" +
+				"0123456789"},
+			nil,
+		},
+		{
+			"FourtyOneLetterUsage",
+			ksat{name: "aName", usage: "0123456789" +
+				"0123456789" +
+				"0123456789" +
+				"0123456789" + "1"},
+			ksatUsageErr{
+				usage: "0123456789" +
+					"0123456789" +
+					"0123456789" +
+					"0123456789" + "1"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.desc, func(t *testing.T) {
+			if ret := tc.task.validate(); ret != tc.expected {
+				t.Fatalf("errors don't match: %v, %v", ret, tc.expected)
 			}
 		})
 	}
