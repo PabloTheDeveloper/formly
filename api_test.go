@@ -1,7 +1,11 @@
 package main
 
-import "testing"
+import (
+	"database/sql"
+	"testing"
+)
 
+/*** Integration Tests ***/
 func TestGetKsatIdByName(t *testing.T) {
 	cases := []struct {
 		desc        string
@@ -12,29 +16,29 @@ func TestGetKsatIdByName(t *testing.T) {
 		{
 			"ZeroLetterName",
 			"",
-			-1,
+			0,
 			ksatNameErr{name: ""},
 		},
 		{
 			"OneLetterName",
 			"a",
-			-1,
-			nil,
+			0,
+			noKsatIdByNameErr{name: "a", err: sql.ErrNoRows},
 		},
 		{
 			"MultipleLetterName",
 			"abc",
-			-1,
-			nil,
+			0,
+			noKsatIdByNameErr{name: "abc", err: sql.ErrNoRows},
 		},
 		{
-			"MultipleLetterNameWhichExists",
+			"MultipleLetterNameWhichExists (first)",
 			"first", // in db as a ksat (first one created)
 			1,
 			nil,
 		},
 		{
-			"MultipleLetterNameWhichExists",
+			"MultipleLetterNameWhichExists (second)",
 			"second", // in db as a ksat (second one created)
 			2,
 			nil,
@@ -42,19 +46,19 @@ func TestGetKsatIdByName(t *testing.T) {
 		{
 			"SixLetterName",
 			"sixsix",
-			-1,
-			nil,
+			0,
+			noKsatIdByNameErr{name: "sixsix", err: sql.ErrNoRows},
 		},
 		{
 			"SevenLetterName",
 			"sevsevs",
-			-1,
+			0,
 			ksatNameErr{name: "sevsevs"},
 		},
 		{
 			"NameWithNumberAndLetters",
 			"a12b",
-			-1,
+			0,
 			wordErr{word: "a12b"},
 		},
 	}
@@ -70,56 +74,3 @@ func TestGetKsatIdByName(t *testing.T) {
 		})
 	}
 }
-
-/*
-func TestNewKsat(t *testing.T) {
-	nameBoundsErr := errors.New("'name' must be between 1-6 characters long")
-	validUsageStr := "some usage"
-	validPrompt := "some prompt"
-	newKsatCases := []struct {
-		desc                 string
-		name, usage, prompts string
-		expected             error
-	}{
-		{
-			"testing invalid ksat name (too low)",
-			"",
-			validUsageStr,
-			validPrompt,
-			nameBoundsErr,
-		},
-		{
-			"testing valid ksat name (lowest inclusion point)",
-			"o",
-			validUsageStr,
-			validPrompt,
-			nil,
-		},
-		{
-			"testing valid ksat name (highest inclusion point)",
-			"onesix",
-			validUsageStr,
-			validPrompt,
-			nil,
-		},
-		{
-			"testing invalid ksat name (too high)",
-			"onesix7",
-			validUsageStr,
-			validPrompt,
-			nameBoundsErr,
-		},
-	}
-
-	for _, tc := range newKsatCases {
-		t.Run(tc.desc, func(t *testing.T) {
-			// err := newKsat(tc.name, tc.usage, tc.prompts)
-
-			// if nameBoundsErr != err {
-			// t.Fatalf("errors don't match, %v, %v", err, tc.expected)
-			// }
-		})
-	}
-}
-
-*/

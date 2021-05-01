@@ -2,35 +2,31 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 )
 
-// getKsatIdByName if returns -1 means it was not found or error along way
-func getKsatIdByName(name string) (int64, error) {
-	var id int64 = -1
-	if err := isKsatNameValid(name); err != nil {
-		return id, err
-	}
-	err := db.QueryRow("SELECT ksat_id FROM ksats WHERE name = ?", name).Scan(&id)
-	if err == sql.ErrNoRows {
-		err = nil
-	}
-	return id, err
+type noKsatIdByNameErr struct {
+	name string
+	err  error
 }
 
-/*
-func (task *ksat) dbCreate() error {
-	stmt, err := db.Prepare("INSERT INTO ksats (name, usage) VALUES (?, ?)")
-	if err != nil {
-		return err
-	}
-	res, err := stmt.Exec(task.name, task.usage)
-	if err != nil {
-		return err
-	}
-	_, err = res.LastInsertId()
-	if err != nil {
-		return err
-	}
-	return nil
+func (e noKsatIdByNameErr) Error() string {
+	return e.err.Error()
 }
-*/
+func (e noKsatIdByNameErr) UserError() string {
+	return fmt.Sprintf("'%v' does not exist", e.name)
+}
+
+// getKsatIdByName if returns 0 means item not found
+func getKsatIdByName(name string) (id int64, err error) {
+	err = isKsatNameValid(name)
+	if err != nil {
+		return
+	}
+	err = db.QueryRow("SELECT ksat_id FROM ksats WHERE name = ?", name).Scan(&id)
+	if err == sql.ErrNoRows {
+		err = noKsatIdByNameErr{name: name, err: err}
+		return
+	}
+	return
+}

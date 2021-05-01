@@ -57,7 +57,6 @@ func (e ksatUsageErr) Error() string {
 func (e ksatUsageErr) UserError() string {
 	return e.Error()
 }
-
 func isKsatUsageValid(usage string) error {
 	if !(len(usage) >= 5 && len(usage) <= 40) {
 		return ksatUsageErr{usage: usage}
@@ -81,5 +80,29 @@ func (task *ksat) validate() error {
 		return err
 	}
 	task.isValidated = true
+	return nil
+}
+func (task *ksat) dbInsert() error {
+	if err := task.validate(); err != nil {
+		return err
+	}
+	// ensure name does not already exists
+	_, err := getKsatIdByName(task.name)
+	if err != nil {
+		return err
+	}
+	stmt, err := db.Prepare("INSERT INTO ksats (name, usage) VALUES (?, ?)")
+	if err != nil {
+		return err
+	}
+	res, err := stmt.Exec(task.name, task.usage)
+	if err != nil {
+		return err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return err
+	}
+	task.id = id
 	return nil
 }

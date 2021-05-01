@@ -2,6 +2,7 @@ package main
 
 import "testing"
 
+/*** Unit Tests ***/
 func TestIsWordValid(t *testing.T) {
 	cases := []struct {
 		desc     string
@@ -183,6 +184,26 @@ func TestValidate(t *testing.T) {
 					"0123456789" +
 					"0123456789" + "1"},
 		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.desc, func(t *testing.T) {
+			if ret := tc.task.validate(); ret != tc.expected {
+				t.Fatalf("errors don't match: %v, %v", ret, tc.expected)
+			}
+		})
+	}
+}
+
+func TestDbInsert(t *testing.T) {
+	cases := []struct {
+		desc     string
+		task     ksat
+		expected error
+	}{
+		// TODO do test cases here
+		// invalid name for ksat (letter combinations)
+		// valid name for ksat existing
+		// valid name for ksat which does not exist yet
 	}
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
