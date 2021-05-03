@@ -82,13 +82,26 @@ func (task *ksat) validate() error {
 	task.isValidated = true
 	return nil
 }
+
+type ksatDbInsertErr struct {
+	name string
+}
+
+func (e ksatDbInsertErr) Error() string {
+	return fmt.Sprintf("'%v' already exists. Please select a new name", e.name)
+}
+func (e ksatDbInsertErr) UserError() string {
+	return e.Error()
+}
+
 func (task *ksat) dbInsert() error {
 	if err := task.validate(); err != nil {
 		return err
 	}
 	// ensure name does not already exists
-	_, err := getKsatIdByName(task.name)
-	if err != nil {
+	if id, err := getKsatIdByName(task.name); id != 0 {
+		return ksatDbInsertErr{name: task.name}
+	} else if _, ok := err.(noKsatIdByNameErr); !ok {
 		return err
 	}
 	stmt, err := db.Prepare("INSERT INTO ksats (name, usage) VALUES (?, ?)")

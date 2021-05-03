@@ -194,21 +194,41 @@ func TestValidate(t *testing.T) {
 	}
 }
 
+/*** Integration Tests ***/
 func TestDbInsert(t *testing.T) {
 	cases := []struct {
-		desc     string
-		task     ksat
-		expected error
+		desc             string
+		task             ksat
+		successfulInsert bool
+		expected         error
 	}{
-		// TODO do test cases here
-		// invalid name for ksat (letter combinations)
-		// valid name for ksat existing
-		// valid name for ksat which does not exist yet
+		{
+			"invalid name for ksat (letter + number)",
+			ksat{name: "a12b", usage: "some usage"},
+			false,
+			wordErr{word: "a12b"},
+		},
+		{
+			"valid name but for a ksat that exists",
+			ksat{name: "first", usage: "first usage here"},
+			false,
+			ksatDbInsertErr{name: "first"},
+		},
+		{
+			"valid name but for a ksat that does not exists",
+			ksat{name: "new", usage: "usage here"},
+			true,
+			nil,
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			if ret := tc.task.validate(); ret != tc.expected {
+			ret := tc.task.dbInsert()
+			if ret != tc.expected {
 				t.Fatalf("errors don't match: %v, %v", ret, tc.expected)
+			}
+			if tc.successfulInsert && tc.task.id == 0 {
+				t.Fatalf("error. Id for new ksat is not assigned")
 			}
 		})
 	}
