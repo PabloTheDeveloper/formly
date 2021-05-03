@@ -1,44 +1,11 @@
 package main
 
-import "testing"
+import (
+	"testing"
+)
 
 /*** Unit Tests ***/
-func TestIsWordValid(t *testing.T) {
-	cases := []struct {
-		desc     string
-		word     string
-		expected error
-	}{
-		{
-			"ZeroLetterWord",
-			"",
-			wordErr{word: ""},
-		},
-		{
-			"OneLetterWord",
-			"a",
-			nil,
-		},
-		{
-			"MultipleLetterWord",
-			"abc",
-			nil,
-		},
-		{
-			"WordWithNumberAndLetters",
-			"a12b",
-			wordErr{word: "a12b"},
-		},
-	}
-	for _, tc := range cases {
-		t.Run(tc.desc, func(t *testing.T) {
-			if ret := isWordValid(tc.word); ret != tc.expected {
-				t.Fatalf("errors don't match: %v, %v", ret, tc.expected)
-			}
-		})
-	}
-}
-func TestIsKsatNameValid(t *testing.T) {
+func TestValidateName(t *testing.T) {
 	cases := []struct {
 		desc     string
 		name     string
@@ -47,7 +14,7 @@ func TestIsKsatNameValid(t *testing.T) {
 		{
 			"ZeroLetterWord",
 			"",
-			ksatNameErr{name: ""},
+			strLengthErr{lower: 1, upper: 6, str: ""},
 		},
 		{
 			"OneLetterWord",
@@ -67,7 +34,7 @@ func TestIsKsatNameValid(t *testing.T) {
 		{
 			"SevenLetterWord",
 			"sevsevs",
-			ksatNameErr{name: "sevsevs"},
+			strLengthErr{lower: 1, upper: 6, str: "sevsevs"},
 		},
 		{
 			"WordWithNumberAndLetters",
@@ -77,13 +44,14 @@ func TestIsKsatNameValid(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			if ret := isKsatNameValid(tc.name); ret != tc.expected {
+			task := ksat{name: tc.name}
+			if ret := task.validateName(); ret != tc.expected {
 				t.Fatalf("errors don't match: %v, %v", ret, tc.expected)
 			}
 		})
 	}
 }
-func TestIsKsatUsageValid(t *testing.T) {
+func TestValidateUsage(t *testing.T) {
 	cases := []struct {
 		desc     string
 		usage    string
@@ -92,12 +60,12 @@ func TestIsKsatUsageValid(t *testing.T) {
 		{
 			"ZeroLetterUsage",
 			"",
-			ksatUsageErr{usage: ""},
+			strLengthErr{lower: 5, upper: 40, str: ""},
 		},
 		{
 			"FourLetterUsage",
 			"abcd",
-			ksatUsageErr{usage: "abcd"},
+			strLengthErr{lower: 5, upper: 40, str: "abcd"},
 		},
 		{
 			"FiveLetterUsage",
@@ -123,8 +91,8 @@ func TestIsKsatUsageValid(t *testing.T) {
 				"0123456789" +
 				"0123456789" +
 				"0123456789" + "1",
-			ksatUsageErr{
-				usage: "0123456789" +
+			strLengthErr{lower: 5, upper: 40,
+				str: "0123456789" +
 					"0123456789" +
 					"0123456789" +
 					"0123456789" + "1"},
@@ -132,7 +100,8 @@ func TestIsKsatUsageValid(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			if ret := isKsatUsageValid(tc.usage); ret != tc.expected {
+			task := ksat{usage: tc.usage}
+			if ret := task.validateUsage(); ret != tc.expected {
 				t.Fatalf("errors don't match: %v, %v", ret, tc.expected)
 			}
 		})
@@ -142,47 +111,23 @@ func TestValidate(t *testing.T) {
 	cases := []struct {
 		desc     string
 		task     ksat
+		success  bool
 		expected error
 	}{
 		{
-			"ZeroLetterInvalidNameValidUsage",
-			ksat{name: "", usage: "some usage"},
-			ksatNameErr{name: ""},
-		},
-		{
-			"ZeroLetterInvalidUsageValidName",
-			ksat{name: "aName", usage: ""},
-			ksatUsageErr{usage: ""},
-		},
-		{
-			"FourLetterInvalidUsageValidName",
-			ksat{name: "aName", usage: "abcd"},
-			ksatUsageErr{usage: "abcd"},
-		},
-		{
-			"SixLetterValidUsageSixLetterValidName",
-			ksat{name: "sixsix", usage: "sixsix"},
-			nil,
-		},
-		{
-			"FourtyLetterUsageValidName",
+			"A Valid ksat",
 			ksat{name: "aName", usage: "0123456789" +
 				"0123456789" +
 				"0123456789" +
 				"0123456789"},
+			true,
 			nil,
 		},
 		{
-			"FourtyOneLetterUsage",
-			ksat{name: "aName", usage: "0123456789" +
-				"0123456789" +
-				"0123456789" +
-				"0123456789" + "1"},
-			ksatUsageErr{
-				usage: "0123456789" +
-					"0123456789" +
-					"0123456789" +
-					"0123456789" + "1"},
+			"A Valid ksat",
+			ksat{name: "", usage: "1234"},
+			false,
+			strLengthErr{lower: 1, upper: 6, str: ""},
 		},
 	}
 	for _, tc := range cases {
@@ -195,6 +140,45 @@ func TestValidate(t *testing.T) {
 }
 
 /*** Integration Tests ***/
+func TestGetKsatByName(t *testing.T) {
+	cases := []struct {
+		desc       string
+		task       ksat
+		successful ksat
+		expected   error
+	}{
+		{
+			"valid name but for a ksat that exists",
+			ksat{name: "first", usage: "first usage here"},
+			ksat{id: 1, name: "first", usage: "some usage"},
+			nil,
+		},
+		{
+			"another valid name but for a ksat that exists",
+			ksat{name: "second", usage: "second usage here"},
+			ksat{id: 2, name: "second", usage: "some more usage"},
+			nil,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.desc, func(t *testing.T) {
+			ret := tc.task.getKsatByName()
+			if ret != tc.expected {
+				t.Fatalf("errors don't match: %v, %v", ret, tc.expected)
+			}
+			if tc.task.id != tc.successful.id {
+				t.Fatalf("ids don't match: %v, %v", tc.task.id, tc.successful.id)
+			}
+			if tc.task.name != tc.successful.name {
+				t.Fatalf("names don't match: %v, %v", tc.task.name, tc.successful.name)
+			}
+			if tc.task.usage != tc.successful.usage {
+				t.Fatalf("usages don't match: %v, %v", tc.task.usage, tc.successful.usage)
+			}
+		})
+	}
+}
+
 func TestDbInsert(t *testing.T) {
 	cases := []struct {
 		desc             string
@@ -212,7 +196,7 @@ func TestDbInsert(t *testing.T) {
 			"valid name but for a ksat that exists",
 			ksat{name: "first", usage: "first usage here"},
 			false,
-			ksatDbInsertErr{name: "first"},
+			alreadyExistsErr{identifier: "first", tableName: "ksat"},
 		},
 		{
 			"valid name but for a ksat that does not exists",
