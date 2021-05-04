@@ -38,7 +38,6 @@ func TestIsWordValid(t *testing.T) {
 		})
 	}
 }
-
 func TestIsStringLengthCorrect(t *testing.T) {
 	// Test not Needed.
 }

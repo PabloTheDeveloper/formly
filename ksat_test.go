@@ -1,6 +1,8 @@
 package main
 
 import (
+	"database/sql"
+	"math"
 	"testing"
 )
 
@@ -162,7 +164,7 @@ func TestGetKsatByName(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			ret := tc.task.getKsatByName()
+			ret := tc.task.getByName()
 			if ret != tc.expected {
 				t.Fatalf("errors don't match: %v, %v", ret, tc.expected)
 			}
@@ -178,9 +180,46 @@ func TestGetKsatByName(t *testing.T) {
 		})
 	}
 }
-
-func TestDbInsert(t *testing.T) {
+func TestGetByID(t *testing.T) {
 	cases := []struct {
+		desc       string
+		task       ksat
+		successful ksat
+		expected   error
+	}{
+		{
+			"valid id for a ksat that exists",
+			ksat{id: 1, name: "first", usage: "some usage"},
+			ksat{id: 1, name: "first", usage: "some usage"},
+			nil,
+		},
+		{
+			"valid id for a ksat that does not exist",
+			ksat{id: 1000, name: "dne", usage: "second usage here"},
+			ksat{id: 1000, name: "dne", usage: "second usage here"}, // needs to be same even if its suppose to fail
+			sql.ErrNoRows,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.desc, func(t *testing.T) {
+			ret := tc.task.getByID()
+			if ret != tc.expected {
+				t.Fatalf("errors don't match: %v, %v", ret, tc.expected)
+			}
+			if tc.task.id != tc.successful.id {
+				t.Fatalf("ids don't match: %v, %v", tc.task.id, tc.successful.id)
+			}
+			if tc.task.name != tc.successful.name {
+				t.Fatalf("names don't match: %v, %v", tc.task.name, tc.successful.name)
+			}
+			if tc.task.usage != tc.successful.usage {
+				t.Fatalf("usages don't match: %v, %v", tc.task.usage, tc.successful.usage)
+			}
+		})
+	}
+}
+func TestDbInsert(t *testing.T) {
+	ksatCases := []struct {
 		desc             string
 		task             ksat
 		successfulInsert bool
@@ -205,7 +244,7 @@ func TestDbInsert(t *testing.T) {
 			nil,
 		},
 	}
-	for _, tc := range cases {
+	for _, tc := range ksatCases {
 		t.Run(tc.desc, func(t *testing.T) {
 			ret := tc.task.dbInsert()
 			if ret != tc.expected {
@@ -213,6 +252,48 @@ func TestDbInsert(t *testing.T) {
 			}
 			if tc.successfulInsert && tc.task.id == 0 {
 				t.Fatalf("error. Id for new ksat is not assigned")
+			}
+		})
+	}
+	promptCases := []struct {
+		desc             string
+		prompt           prompt
+		successfulInsert bool
+		expected         error
+	}{
+		{
+			"perfect prompt but the ksat_id makes it invalid",
+			prompt{ksatID: 0, sequence: 0, flag: "firstflag", usage: "some usage"},
+			false,
+			sql.ErrNoRows,
+		},
+		{
+			"perfect prompt but the sequence makes it invalid",
+			prompt{ksatID: 1, sequence: -1, flag: "firstflag", usage: "some usage"},
+			false,
+			numLengthErr{lower: 0, upper: math.MaxInt64, num: -1},
+		},
+		{
+			"valid prompt (no sequence conflict since it is the first flag for ksat)",
+			prompt{ksatID: 1, sequence: 0, flag: "firstflag", usage: "some usage"},
+			false,
+			nil,
+		},
+		{
+			"valid prompt (no sequence conflict)",
+			prompt{ksatID: 1, sequence: 1, flag: "secondflag", usage: "some usage"},
+			true,
+			nil,
+		},
+	}
+	for _, tc := range promptCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			ret := tc.prompt.dbInsert()
+			if ret != tc.expected {
+				t.Fatalf("errors don't match: %v, %v", ret, tc.expected)
+			}
+			if tc.successfulInsert && tc.prompt.id == 0 {
+				t.Fatalf("error. Id for new prompt is not assigned")
 			}
 		})
 	}

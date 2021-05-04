@@ -15,18 +15,11 @@ func (task *ksat) validateName() error {
 	if err := isStringLengthCorrect(task.name, 1, 6); err != nil {
 		return err
 	}
-	if err := isWordValid(task.name); err != nil {
-		return err
-	}
-	return nil
+	return isWordValid(task.name)
 }
 func (task *ksat) validateUsage() error {
-	if err := isStringLengthCorrect(task.usage, 5, 40); err != nil {
-		return err
-	}
-	return nil
+	return isStringLengthCorrect(task.usage, 5, 40)
 }
-
 func (task *ksat) validate() error {
 	task.isValidated = false
 	if err := task.validateName(); err != nil {
@@ -38,16 +31,17 @@ func (task *ksat) validate() error {
 	task.isValidated = true
 	return nil
 }
-func (task *ksat) getKsatByName() error {
+func (task *ksat) getByName() error {
 	if err := task.validateName(); err != nil {
 		return err
 	}
-	if err := db.QueryRow(
-		"SELECT ksat_id, name, usage FROM ksats WHERE name = ?", task.name,
-	).Scan(&task.id, &task.name, &task.usage); err != nil {
-		return err
-	}
-	return nil
+	return db.QueryRow(
+		"select ksat_id, name, usage from ksats where name = ?", task.name,
+	).Scan(&task.id, &task.name, &task.usage)
+}
+func (task *ksat) getByID() error {
+	return db.QueryRow(
+		"select ksat_id, name, usage from ksats where ksat_id = ?", task.id).Scan(&task.id, &task.name, &task.usage)
 }
 
 type alreadyExistsErr struct {
@@ -61,7 +55,7 @@ func (task *ksat) dbInsert() error {
 	if err := task.validate(); err != nil {
 		return err
 	}
-	if err := task.getKsatByName(); err == nil {
+	if err := task.getByName(); err == nil {
 		return alreadyExistsErr{identifier: task.name, tableName: "ksat"}
 	} else if err != sql.ErrNoRows {
 		return err // some other error than ksat error
