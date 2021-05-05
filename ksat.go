@@ -99,3 +99,24 @@ func (task *ksat) dbInsert() error {
 	}
 	return nil
 }
+func getKsats() ([]ksat, error) {
+	ksats := []ksat{}
+	rows, err := db.Query("SELECT ksat_id, name, usage FROM ksats")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		item := ksat{}
+		err := rows.Scan(&item.id, &item.name, &item.usage)
+		if err != nil {
+			return nil, err
+		}
+		ksats = append(ksats, item)
+	}
+	err = rows.Err()
+	if err != nil {
+		return nil, err
+	}
+	return ksats, nil
+}
