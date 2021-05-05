@@ -51,6 +51,31 @@ type alreadyExistsErr struct {
 func (e alreadyExistsErr) Error() string {
 	return fmt.Sprintf("'%s', %s already exists", e.identifier, e.tableName)
 }
+
+func (task *ksat) getPromptsByID() ([]prompt, error) {
+	if err := task.getByID(); err != nil {
+		return nil, err
+	}
+	prompts := []prompt{}
+	rows, err := db.Query("select ksat_id, prompt_id, sequence, flag, usage from prompts where ksat_id = ?", task.id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		item := prompt{}
+		err := rows.Scan(&item.ksatID, &item.id, &item.sequence, &item.flag, &item.usage)
+		if err != nil {
+			return nil, err
+		}
+		prompts = append(prompts, item)
+	}
+	err = rows.Err()
+	if err != nil {
+		return nil, err
+	}
+	return prompts, nil
+}
 func (task *ksat) dbInsert() error {
 	if err := task.validate(); err != nil {
 		return err

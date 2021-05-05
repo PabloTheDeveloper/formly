@@ -14,5 +14,9 @@ func TestValidateFlag(t *testing.T) {
 // func TestValidateUsage(t *testing.T) {
 // TODO implement when issues come up
 //}
-
-/*** Integration Tests ***/
+func TestPromptsFlag(t *testing.T) {
+	// TODO implement when issues come up
+}
+func TestPromptsSequences(t *testing.T) {
+	// TODO implement when issues come up
+}

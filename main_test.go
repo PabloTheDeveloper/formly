@@ -37,9 +37,37 @@ func setUp() (string, error) {
 			name:  "second",
 			usage: "some more usage",
 		},
+		ksat{
+			name:  "hasP",
+			usage: "usage",
+		},
 	}
 	for _, task := range ksats {
 		if _, err := createKsatStmt.Exec(task.name, task.usage); err != nil {
+			return dir, err
+		}
+	}
+
+	createPromptStmt, err := db.Prepare("INSERT INTO prompts (ksat_id, sequence, flag, usage) VALUES (?, ?, ?, ?)")
+	if err != nil {
+		return dir, err
+	}
+	prompts := []prompt{
+		prompt{
+			ksatID:   3,
+			sequence: 1,
+			flag:     "firstflag",
+			usage:    "some usage",
+		},
+		prompt{
+			ksatID:   3,
+			sequence: 2,
+			flag:     "secondflag",
+			usage:    "some usage",
+		},
+	}
+	for _, item := range prompts {
+		if _, err := createPromptStmt.Exec(item.ksatID, item.sequence, item.flag, item.usage); err != nil {
 			return dir, err
 		}
 	}

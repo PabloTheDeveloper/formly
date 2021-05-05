@@ -1,6 +1,9 @@
 package main
 
-import "math"
+import (
+	"fmt"
+	"math"
+)
 
 type prompt struct {
 	id, ksatID, sequence int64
@@ -8,7 +11,7 @@ type prompt struct {
 }
 
 func (prompt *prompt) validateSequence() error {
-	return isNumBoundsCorrect(prompt.sequence, 0, math.MaxInt64)
+	return isNumBoundsCorrect(prompt.sequence, 1, math.MaxInt64)
 }
 func (prompt *prompt) validateFlag() error {
 	if err := isStringLengthCorrect(prompt.flag, 1, 10); err != nil {
@@ -28,16 +31,63 @@ func (prompt *prompt) validate() error {
 	}
 	return prompt.validateUsage()
 }
+
+type flagNotUniqueErr struct {
+	flag string
+}
+
+func (e flagNotUniqueErr) Error() string {
+	return fmt.Sprintf("'%s' is not unique", e.flag)
+}
+func validatePromptsFlags(flag string, prompts []prompt) error {
+	p := prompt{flag: flag}
+	if err := p.validateFlag(); err != nil {
+		return err
+	}
+	for _, item := range prompts {
+		if flag == item.flag {
+			return flagNotUniqueErr{flag: flag}
+		}
+	}
+	return nil
+}
+
+type sequenceErr struct {
+	sequence, accurateSequence int64
+	prompt                     prompt
+}
+
+func (e sequenceErr) Error() string {
+	return fmt.Sprintf("'%v' is the sequence for prompt: %v.\nIt should be %v",
+		e.sequence, e.prompt, e.accurateSequence)
+}
+func validatePromptsSequences(prompts []prompt) error {
+	for i, item := range prompts {
+		if expectedSequence := int64(i + 1); expectedSequence != item.sequence {
+			return sequenceErr{sequence: item.sequence, accurateSequence: expectedSequence, prompt: item}
+		}
+	}
+	return nil
+}
+
 func (prompt *prompt) dbInsert() error {
 	if err := prompt.validate(); err != nil {
 		return err
 	}
 	task := ksat{id: prompt.ksatID}
-	if err := task.getByID(); err != nil {
+	prompts, err := task.getPromptsByID()
+	if err != nil {
 		return err
 	}
-	//TODO ensure that no other prompt with ksat contains sequence
-	// TODO ensure flag with ksat combination is unique
+	if err := validatePromptsFlags(prompt.flag, prompts); err != nil {
+		return err
+	}
+	if err := validatePromptsSequences(prompts); err != nil {
+		return err
+	}
+	if expectedSequence := int64(len(prompts) + 1); expectedSequence != prompt.sequence {
+		return sequenceErr{sequence: prompt.sequence, accurateSequence: expectedSequence, prompt: *prompt}
+	}
 	stmt, err := db.Prepare("INSERT INTO prompts (ksat_id, sequence, flag, usage) VALUES (?, ?, ?, ?)")
 	if err != nil {
 		return err

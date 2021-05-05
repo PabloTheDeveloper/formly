@@ -218,6 +218,58 @@ func TestGetByID(t *testing.T) {
 		})
 	}
 }
+func TestGetPromptsByID(t *testing.T) {
+	cases := []struct {
+		desc    string
+		task    ksat
+		prompts []prompt
+		err     error
+	}{
+		{
+			"valid ID which contains 1 valid prompt",
+			ksat{id: 3, name: "hasP", usage: "usage"},
+			[]prompt{
+				prompt{id: 1, ksatID: 3, sequence: 1, flag: "firstflag", usage: "some usage"},
+				prompt{id: 2, ksatID: 3, sequence: 2, flag: "secondflag", usage: "some usage"},
+			},
+			nil,
+		},
+		{
+			"valid ID but it has no prompt",
+			ksat{id: 1, name: "first", usage: "some usage"},
+			[]prompt{},
+			nil,
+		},
+		{
+			"valid id for a ksat that does not exist",
+			ksat{id: 1000, name: "dne", usage: "second usage here"},
+			nil,
+			sql.ErrNoRows,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.desc, func(t *testing.T) {
+			prompts, err := tc.task.getPromptsByID()
+			if err != tc.err {
+				t.Fatalf("errors don't match: %v, %v", err, tc.err)
+			}
+			for i, item := range prompts {
+				if item.id != tc.prompts[i].id {
+					t.Fatalf("ids don't match: %v, %v", item.id, tc.prompts[i].id)
+				}
+				if item.sequence != tc.prompts[i].sequence {
+					t.Fatalf("sequence don't match: %v, %v", item.sequence, tc.prompts[i].sequence)
+				}
+				if item.flag != tc.prompts[i].flag {
+					t.Fatalf("flags don't match: %v, %v", item.flag, tc.prompts[i].flag)
+				}
+				if item.usage != tc.prompts[i].usage {
+					t.Fatalf("usages don't match: %v, %v", item.usage, tc.prompts[i].usage)
+				}
+			}
+		})
+	}
+}
 func TestDbInsert(t *testing.T) {
 	ksatCases := []struct {
 		desc             string
@@ -263,7 +315,7 @@ func TestDbInsert(t *testing.T) {
 	}{
 		{
 			"perfect prompt but the ksat_id makes it invalid",
-			prompt{ksatID: 0, sequence: 0, flag: "firstflag", usage: "some usage"},
+			prompt{ksatID: 0, sequence: 1, flag: "firstflag", usage: "some usage"},
 			false,
 			sql.ErrNoRows,
 		},
@@ -271,17 +323,17 @@ func TestDbInsert(t *testing.T) {
 			"perfect prompt but the sequence makes it invalid",
 			prompt{ksatID: 1, sequence: -1, flag: "firstflag", usage: "some usage"},
 			false,
-			numLengthErr{lower: 0, upper: math.MaxInt64, num: -1},
+			numLengthErr{lower: 1, upper: math.MaxInt64, num: -1},
 		},
 		{
-			"valid prompt (no sequence conflict since it is the first flag for ksat)",
-			prompt{ksatID: 1, sequence: 0, flag: "firstflag", usage: "some usage"},
-			false,
+			"valid prompt (no sequence conflict since it is the first flag for 'first' ksat)",
+			prompt{ksatID: 1, sequence: 1, flag: "firstflag", usage: "some usage"},
+			true,
 			nil,
 		},
 		{
 			"valid prompt (no sequence conflict)",
-			prompt{ksatID: 1, sequence: 1, flag: "secondflag", usage: "some usage"},
+			prompt{ksatID: 1, sequence: 2, flag: "secondflag", usage: "some usage"},
 			true,
 			nil,
 		},
