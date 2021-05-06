@@ -86,9 +86,30 @@ func setUp() (string, error) {
 			return dir, err
 		}
 	}
+	/*
+		Creating entrys in db for testing
+	*/
+	createEntryStmt, err := db.Prepare("INSERT INTO entries (session_id, prompt_id, txt) VALUES (?, ?, ?)")
+	if err != nil {
+		return dir, err
+	}
+	entrys := []entry{
+		{
+			sessionID: 1,
+			promptID:  1,
+			txt:       "first entry",
+		}, {
+			sessionID: 1,
+			promptID:  2,
+			txt:       "second entry",
+		}}
+	for _, entry := range entrys {
+		if _, err := createEntryStmt.Exec(entry.sessionID, entry.promptID, entry.txt); err != nil {
+			return dir, err
+		}
+	}
 	return dir, nil
 }
-
 func tearDown(dir string) error {
 	if err := db.Close(); err != nil {
 		return err
@@ -98,7 +119,6 @@ func tearDown(dir string) error {
 	}
 	return nil
 }
-
 func TestMain(m *testing.M) {
 	tmpDir, err := setUp()
 	if err != nil {

@@ -69,7 +69,18 @@ func validatePromptsSequences(prompts []prompt) error {
 	}
 	return nil
 }
-
+func (prompt *prompt) getByID() error {
+	return db.QueryRow(
+		"SELECT prompt_id, ksat_id, sequence, flag, usage FROM prompts WHERE prompt_id = ?",
+		prompt.id,
+	).Scan(
+		&prompt.id,
+		&prompt.ksatID,
+		&prompt.sequence,
+		&prompt.flag,
+		&prompt.usage,
+	)
+}
 func (prompt *prompt) dbInsert() error {
 	if err := prompt.validate(); err != nil {
 		return err

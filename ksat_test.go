@@ -181,7 +181,7 @@ func TestGetKsatByName(t *testing.T) {
 	}
 }
 func TestGetByID(t *testing.T) {
-	cases := []struct {
+	taskCases := []struct {
 		desc       string
 		task       ksat
 		successful ksat
@@ -200,7 +200,7 @@ func TestGetByID(t *testing.T) {
 			sql.ErrNoRows,
 		},
 	}
-	for _, tc := range cases {
+	for _, tc := range taskCases {
 		t.Run(tc.desc, func(t *testing.T) {
 			ret := tc.task.getByID()
 			if ret != tc.expected {
@@ -214,6 +214,91 @@ func TestGetByID(t *testing.T) {
 			}
 			if tc.task.usage != tc.successful.usage {
 				t.Fatalf("usages don't match: %v, %v", tc.task.usage, tc.successful.usage)
+			}
+		})
+	}
+	promptCases := []struct {
+		desc       string
+		prompt     prompt
+		successful prompt
+		expected   error
+	}{
+		{
+			"valid id for a prompt that exists",
+			prompt{
+				id:       1,
+				ksatID:   3,
+				sequence: 1,
+				flag:     "firstflag",
+				usage:    "some usage",
+			},
+			prompt{
+				id:       1,
+				ksatID:   3,
+				sequence: 1,
+				flag:     "firstflag",
+				usage:    "some usage",
+			},
+			nil,
+		},
+		{
+			"valid id for a prompt that does not exist",
+			prompt{id: 1000, sequence: 10, flag: "dne", usage: "second usage here"},
+			prompt{id: 1000, sequence: 10, flag: "dne", usage: "second usage here"}, // needs to be same even if its suppose to fail
+			sql.ErrNoRows,
+		},
+	}
+	for _, tc := range promptCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			ret := tc.prompt.getByID()
+			if ret != tc.expected {
+				t.Fatalf("errors don't match: %v, %v", ret, tc.expected)
+			}
+			if tc.prompt.id != tc.successful.id {
+				t.Fatalf("ids don't match: %v, %v", tc.prompt.id, tc.successful.id)
+			}
+			if tc.prompt.sequence != tc.successful.sequence {
+				t.Fatalf("sequences don't match: %v, %v",
+					tc.prompt.sequence, tc.successful.sequence)
+			}
+			if tc.prompt.flag != tc.successful.flag {
+				t.Fatalf("flags don't match: %v, %v", tc.prompt.flag, tc.successful.flag)
+			}
+			if tc.prompt.usage != tc.successful.usage {
+				t.Fatalf("usages don't match: %v, %v", tc.prompt.usage, tc.successful.usage)
+			}
+		})
+	}
+	sessionCases := []struct {
+		desc       string
+		session    session
+		successful session
+		expected   error
+	}{
+		{
+			"valid id for a session that exists",
+			session{id: 1, ksatID: 3},
+			session{id: 1, ksatID: 3},
+			nil,
+		},
+		{
+			"valid id for a session that does not exist",
+			session{id: 10000, ksatID: 10000},
+			session{id: 10000, ksatID: 10000},
+			sql.ErrNoRows,
+		},
+	}
+	for _, tc := range sessionCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			ret := tc.session.getByID()
+			if ret != tc.expected {
+				t.Fatalf("errors don't match: %v, %v", ret, tc.expected)
+			}
+			if tc.session.id != tc.successful.id {
+				t.Fatalf("ids don't match: %v, %v", tc.session.id, tc.successful.id)
+			}
+			if tc.session.ksatID != tc.successful.ksatID {
+				t.Fatalf("ksatIDs don't match: %v, %v", tc.session.ksatID, tc.successful.ksatID)
 			}
 		})
 	}
@@ -373,7 +458,35 @@ func TestDbInsert(t *testing.T) {
 			}
 		})
 	}
-
+	entryCases := []struct {
+		desc     string
+		entry    entry
+		expected error
+	}{
+		{
+			"valid entry creation",
+			entry{sessionID: 2, promptID: 1, txt: "some text"},
+			nil,
+		},
+		{
+			"invalid entry creation (no valid sessionID)",
+			entry{sessionID: 10101, promptID: 1, txt: "some txt"},
+			sql.ErrNoRows,
+		},
+		{
+			"invalid entry creation (no valid promptID)",
+			entry{sessionID: 2, promptID: 10101, txt: "some txt"},
+			sql.ErrNoRows,
+		},
+	}
+	for _, tc := range entryCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			ret := tc.entry.dbInsert()
+			if ret != tc.expected {
+				t.Fatalf("errors don't match: %v, %v", ret, tc.expected)
+			}
+		})
+	}
 }
 func TestGetKsats(t *testing.T) {
 	type result struct {

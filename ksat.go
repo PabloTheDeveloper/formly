@@ -41,7 +41,9 @@ func (task *ksat) getByName() error {
 }
 func (task *ksat) getByID() error {
 	return db.QueryRow(
-		"select ksat_id, name, usage from ksats where ksat_id = ?", task.id).Scan(&task.id, &task.name, &task.usage)
+		"select ksat_id, name, usage from ksats where ksat_id = ?",
+		task.id,
+	).Scan(&task.id, &task.name, &task.usage)
 }
 
 type alreadyExistsErr struct {

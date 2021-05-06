@@ -46,8 +46,8 @@ func createDB() error {
 			txt TEXT,
 			session_id INTEGER NOT NULL,
 			prompt_id INTEGER NOT NULL,
-			FOREIGN KEY (session_id) REFERENCES sessions (session_id) ON UPDATE CASCADE ON DELETE CASCADE,
-			FOREIGN KEY (prompt_id) REFERENCES prompts (prompt_id) ON UPDATE CASCADE ON DELETE CASCADE
+			FOREIGN KEY (prompt_id) REFERENCES prompts (prompt_id) ON UPDATE CASCADE ON DELETE CASCADE,
+			FOREIGN KEY (session_id) REFERENCES sessions (session_id) ON UPDATE CASCADE ON DELETE CASCADE
 		);
 	`)
 	return err
