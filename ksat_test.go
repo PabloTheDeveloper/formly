@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"math"
 	"testing"
+	"time"
 )
 
 /*** Unit Tests ***/
@@ -277,14 +278,30 @@ func TestGetByID(t *testing.T) {
 	}{
 		{
 			"valid id for a session that exists",
-			session{id: 1, ksatID: 3},
-			session{id: 1, ksatID: 3},
+			session{
+				id:       1,
+				ksatID:   3,
+				createAt: time.Date(2001, 11, 17, 20, 34, 58, 651387237, time.UTC),
+			},
+			session{
+				id:       1,
+				ksatID:   3,
+				createAt: time.Date(2001, 11, 17, 20, 34, 58, 651387237, time.UTC),
+			},
 			nil,
 		},
 		{
 			"valid id for a session that does not exist",
-			session{id: 10000, ksatID: 10000},
-			session{id: 10000, ksatID: 10000},
+			session{
+				id:       10101,
+				ksatID:   3,
+				createAt: time.Date(2001, 11, 17, 20, 34, 58, 651387237, time.UTC),
+			},
+			session{
+				id:       10101,
+				ksatID:   3,
+				createAt: time.Date(2001, 11, 17, 20, 34, 58, 651387237, time.UTC),
+			},
 			sql.ErrNoRows,
 		},
 	}
@@ -350,6 +367,60 @@ func TestGetPromptsByID(t *testing.T) {
 				}
 				if item.usage != tc.prompts[i].usage {
 					t.Fatalf("usages don't match: %v, %v", item.usage, tc.prompts[i].usage)
+				}
+			}
+		})
+	}
+}
+func TestGetSessionsByID(t *testing.T) {
+	cases := []struct {
+		desc     string
+		task     ksat
+		sessions []session
+		err      error
+	}{
+		{
+			"valid ID which contains 1 valid session",
+			ksat{id: 3, name: "hasP", usage: "usage"},
+			[]session{
+				{
+					id:       1,
+					ksatID:   3,
+					createAt: time.Date(2000, 11, 17, 20, 34, 58, 651387237, time.UTC),
+				},
+				{
+					id:       2,
+					ksatID:   3,
+					createAt: time.Date(2001, 11, 17, 20, 34, 58, 651387237, time.UTC),
+				},
+			},
+			nil,
+		},
+		{
+			"valid ID but it has no session",
+			ksat{id: 1, name: "first", usage: "some usage"},
+			[]session{},
+			nil,
+		},
+		{
+			"valid id for a ksat that does not exist",
+			ksat{id: 1000, name: "dne", usage: "second usage here"},
+			nil,
+			sql.ErrNoRows,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.desc, func(t *testing.T) {
+			sessions, err := tc.task.getSessionsByID()
+			if err != tc.err {
+				t.Fatalf("errors don't match: %v, %v", err, tc.err)
+			}
+			for i, item := range sessions {
+				if item.id != tc.sessions[i].id {
+					t.Fatalf("ids don't match: %v, %v", item.id, tc.sessions[i].id)
+				}
+				if item.createAt != tc.sessions[i].createAt {
+					t.Fatalf("createAts don't match: %v, %v", item.createAt, tc.sessions[i].createAt)
 				}
 			}
 		})

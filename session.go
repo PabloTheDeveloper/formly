@@ -1,7 +1,10 @@
 package main
 
+import "time"
+
 type session struct {
 	id, ksatID int64
+	createAt   time.Time
 }
 
 func (session *session) dbInsert() error {
@@ -25,9 +28,9 @@ func (session *session) dbInsert() error {
 }
 func (session *session) getByID() error {
 	return db.QueryRow(
-		"SELECT session_id, ksat_id FROM sessions WHERE session_id = ?",
+		"SELECT session_id, ksat_id, created_at FROM sessions WHERE session_id = ?",
 		session.id,
-	).Scan(&session.id, &session.ksatID)
+	).Scan(&session.id, &session.ksatID, &session.createAt)
 }
 
 type entry struct {

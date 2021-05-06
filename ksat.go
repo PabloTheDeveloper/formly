@@ -78,6 +78,30 @@ func (task *ksat) getPromptsByID() ([]prompt, error) {
 	}
 	return prompts, nil
 }
+func (task *ksat) getSessionsByID() ([]session, error) {
+	if err := task.getByID(); err != nil {
+		return nil, err
+	}
+	sessions := []session{}
+	rows, err := db.Query("SELECT session_id, ksat_id, created_at FROM sessions WHERE ksat_id = ?", task.id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		item := session{}
+		err := rows.Scan(&item.id, &item.ksatID, &item.createAt)
+		if err != nil {
+			return nil, err
+		}
+		sessions = append(sessions, item)
+	}
+	err = rows.Err()
+	if err != nil {
+		return nil, err
+	}
+	return sessions, nil
+}
 func (task *ksat) dbInsert() error {
 	if err := task.validate(); err != nil {
 		return err

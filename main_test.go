@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func setUp() (string, error) {
@@ -76,13 +77,22 @@ func setUp() (string, error) {
 	/*
 		Creating sessions in db for testing
 	*/
-	createSessionStmt, err := db.Prepare("INSERT INTO sessions (ksat_id) VALUES (?)")
+	createSessionStmt, err := db.Prepare("INSERT INTO sessions (ksat_id, created_at) VALUES (?, ?)")
 	if err != nil {
 		return dir, err
 	}
-	sessions := []session{{ksatID: 3}, {ksatID: 3}}
+	sessions := []session{
+		{
+			ksatID:   3,
+			createAt: time.Date(2000, 11, 17, 20, 34, 58, 651387237, time.UTC),
+		},
+		{
+			ksatID:   3,
+			createAt: time.Date(2001, 11, 17, 20, 34, 58, 651387237, time.UTC),
+		},
+	}
 	for _, session := range sessions {
-		if _, err := createSessionStmt.Exec(session.ksatID); err != nil {
+		if _, err := createSessionStmt.Exec(session.ksatID, session.createAt); err != nil {
 			return dir, err
 		}
 	}
