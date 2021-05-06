@@ -47,7 +47,9 @@ func setUp() (string, error) {
 			return dir, err
 		}
 	}
-
+	/*
+		Creating prompts in db for testing
+	*/
 	createPromptStmt, err := db.Prepare("INSERT INTO prompts (ksat_id, sequence, flag, usage) VALUES (?, ?, ?, ?)")
 	if err != nil {
 		return dir, err
@@ -68,6 +70,19 @@ func setUp() (string, error) {
 	}
 	for _, item := range prompts {
 		if _, err := createPromptStmt.Exec(item.ksatID, item.sequence, item.flag, item.usage); err != nil {
+			return dir, err
+		}
+	}
+	/*
+		Creating sessions in db for testing
+	*/
+	createSessionStmt, err := db.Prepare("INSERT INTO sessions (ksat_id) VALUES (?)")
+	if err != nil {
+		return dir, err
+	}
+	sessions := []session{{ksatID: 3}, {ksatID: 3}}
+	for _, session := range sessions {
+		if _, err := createSessionStmt.Exec(session.ksatID); err != nil {
 			return dir, err
 		}
 	}

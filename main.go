@@ -2,15 +2,17 @@ package main
 
 import (
 	"database/sql"
-	_ "github.com/mattn/go-sqlite3"
 	"log"
 	"os"
 	"path/filepath"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 var db *sql.DB
 
 func createDB() error {
+	// all foreign_keys must be at the bottom of tables. Otherwise error
 	_, err := db.Exec(`
 		PRAGMA foreign_keys = ON;
 
@@ -41,11 +43,11 @@ func createDB() error {
 		CREATE TABLE IF NOT EXISTS entries (
 			entry_id INTEGER PRIMARY KEY AUTOINCREMENT,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			sequence INTEGER NOT NULL CHECK(sequence > -1),
-			label TEXT NOT NULL CHECK(length(label) > 0),
 			txt TEXT,
 			session_id INTEGER NOT NULL,
-			FOREIGN KEY (session_id) REFERENCES sessions (session_id) ON UPDATE CASCADE ON DELETE CASCADE
+			prompt_id INTEGER NOT NULL,
+			FOREIGN KEY (session_id) REFERENCES sessions (session_id) ON UPDATE CASCADE ON DELETE CASCADE,
+			FOREIGN KEY (prompt_id) REFERENCES prompts (prompt_id) ON UPDATE CASCADE ON DELETE CASCADE
 		);
 	`)
 	return err

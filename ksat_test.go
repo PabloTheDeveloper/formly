@@ -349,6 +349,31 @@ func TestDbInsert(t *testing.T) {
 			}
 		})
 	}
+	sessionCases := []struct {
+		desc     string
+		session  session
+		expected error
+	}{
+		{
+			"valid session creation",
+			session{ksatID: 3},
+			nil,
+		},
+		{
+			"invalid session creation (no ksat)",
+			session{ksatID: 10101},
+			sql.ErrNoRows,
+		},
+	}
+	for _, tc := range sessionCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			ret := tc.session.dbInsert()
+			if ret != tc.expected {
+				t.Fatalf("errors don't match: %v, %v", ret, tc.expected)
+			}
+		})
+	}
+
 }
 func TestGetKsats(t *testing.T) {
 	type result struct {
