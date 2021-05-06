@@ -32,6 +32,30 @@ func (session *session) getByID() error {
 		session.id,
 	).Scan(&session.id, &session.ksatID, &session.createAt)
 }
+func (session *session) getEntriesByID() ([]entry, error) {
+	if err := session.getByID(); err != nil {
+		return nil, err
+	}
+	entries := []entry{}
+	rows, err := db.Query("SELECT entry_id, session_id, prompt_id, txt FROM entries WHERE session_id = ?", session.id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		item := entry{}
+		err := rows.Scan(&item.id, &item.sessionID, &item.promptID, &item.txt)
+		if err != nil {
+			return nil, err
+		}
+		entries = append(entries, item)
+	}
+	err = rows.Err()
+	if err != nil {
+		return nil, err
+	}
+	return entries, nil
+}
 
 type entry struct {
 	id, sessionID, promptID int64

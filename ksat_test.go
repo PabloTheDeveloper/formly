@@ -356,6 +356,10 @@ func TestGetPromptsByID(t *testing.T) {
 				t.Fatalf("errors don't match: %v, %v", err, tc.err)
 			}
 			for i, item := range prompts {
+				// needed since I am creating more prompts than are shown
+				if i >= len(tc.prompts) {
+					break
+				}
 				if item.id != tc.prompts[i].id {
 					t.Fatalf("ids don't match: %v, %v", item.id, tc.prompts[i].id)
 				}
@@ -416,6 +420,10 @@ func TestGetSessionsByID(t *testing.T) {
 				t.Fatalf("errors don't match: %v, %v", err, tc.err)
 			}
 			for i, item := range sessions {
+				// needed since I am creating more sessions than are shown
+				if i >= len(tc.sessions) {
+					break
+				}
 				if item.id != tc.sessions[i].id {
 					t.Fatalf("ids don't match: %v, %v", item.id, tc.sessions[i].id)
 				}
@@ -583,11 +591,13 @@ func TestGetKsats(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
 			ksats, err := getKsats()
+			//
 			if err != tc.expected.err {
 				t.Fatalf("errors don't match: %v, %v", err, tc.expected.err)
 			}
 			for i, item := range tc.expected.ksats {
-				if i > len(ksats)-1 {
+				//  needed since I am creating more sessions than are shown
+				if i >= len(ksats) {
 					t.Fatalf("ksats returned have less items than expected: items missing at ith '%v': %v", i, ksats[i:])
 				}
 				if item.id != tc.expected.ksats[i].id {
