@@ -2,6 +2,8 @@ package main
 
 import (
 	"database/sql"
+	"flag"
+	"fmt"
 	"testing"
 )
 
@@ -57,5 +59,51 @@ func TestNewCommand(t *testing.T) {
 				)
 			}
 		})
+	}
+}
+func TestExecuteCommand(t *testing.T) {
+	type expected struct {
+		command command
+		error
+	}
+	cases := []struct {
+		desc string
+		command
+		expected
+	}{
+		{
+			"valid prompts and flags set (and exist in db)",
+			command{
+				ksat:     ksat{id: 3},
+				FlagSet:  flag.NewFlagSet("hasP", flag.ExitOnError),
+				flagArgs: []string{"firstflag='data'", "secondflag='data'"},
+			},
+			expected{
+				command{},
+				nil,
+			},
+		},
+		{
+			"valid prompts but missing flag (and exist in db) (should work)",
+			command{
+				ksat:     ksat{id: 3},
+				FlagSet:  flag.NewFlagSet("hasP", flag.ExitOnError),
+				flagArgs: []string{"firstflag='data'"},
+			},
+			expected{
+				command{},
+				nil,
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.desc, func(t *testing.T) {
+			given := expected{}
+			given.error = tc.command.executeCommand()
+			if given.error != tc.expected.error {
+				t.Fatalf("given error: %v\nexpected error: %v", given.error, tc.expected.error)
+			}
+		})
+		fmt.Println(tc.command.entries)
 	}
 }
