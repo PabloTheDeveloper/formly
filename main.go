@@ -69,5 +69,43 @@ func main() {
 	if err := createDB(); err != nil {
 		log.Fatal(err)
 	}
+	if _, err := newCommand(os.Args); err != nil {
+		log.Fatal(err)
+	}
+	/*
+		TODO
+		def: help = return all ksats and their usage
+		def: curr = return all ksats and respective entries for the day? Not sure
+
+		// parse  TopLevelFlags  (can be done like the other)
+		if cmd has help flag:
+			ret help
+		if cmd has other flags:
+			return custom err
+
+		// parse Command
+		if cmd empty (or ret curr):
+			ret help
+		if cmd has poorly formatted word:
+			return validated err
+		if cmd dne in db:
+			return err about that
+
+		// parse CommandFlags (this the other i refer to in 'TopLevelFlags')
+		prompts, err := task.getPromptsByID()
+		for prompts:
+		err := prompt.getByID()
+			check if flag exists, check it off too?
+		return customr errs (plural) (similar to prior 'custom err') if there is an err
+
+		make sure the flags are all accounted for in the prompts (ie nothing is missing or added)
+		return another type of custom err here if that is the case
+
+		// insert Entries
+		for each prompt grab the id, and the respective flag as well. put it in entry
+
+		make sure the entries are all accounted for in the session (ie nothing is missing or added)
+		return another type of custom err here if that is the case
+	*/
 	defer db.Close()
 }
