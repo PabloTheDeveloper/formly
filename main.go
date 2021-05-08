@@ -52,50 +52,6 @@ func createDB() error {
 	`)
 	return err
 }
-func createStandardKsats() error {
-	/* Creating ksats in db for testing */
-	createKsatStmt, err := db.Prepare("INSERT INTO ksats (name, usage) VALUES (?, ?)")
-	if err != nil {
-		return err
-	}
-	ksats := []ksat{
-		ksat{
-			name:  "ffact",
-			usage: "for making notes of your life",
-		},
-	}
-	for _, task := range ksats {
-		if _, err := createKsatStmt.Exec(task.name, task.usage); err != nil {
-			return err
-		}
-	}
-	/* Creating prompts in db for testing */
-	createPromptStmt, err := db.Prepare(
-		"INSERT INTO prompts (ksat_id, sequence, flag, usage) VALUES (?, ?, ?, ?)",
-	)
-	if err != nil {
-		return err
-	}
-	prompts := []prompt{
-		prompt{
-			ksatID:   1,
-			sequence: 1,
-			flag:     "f",
-			usage:    "place fact here",
-		},
-	}
-	for _, item := range prompts {
-		if _, err := createPromptStmt.Exec(
-			item.ksatID,
-			item.sequence,
-			item.flag,
-			item.usage,
-		); err != nil {
-			return err
-		}
-	}
-	return nil
-}
 func main() {
 	homePath, err := os.UserHomeDir()
 	if err != nil {
@@ -113,12 +69,6 @@ func main() {
 	if err := createDB(); err != nil {
 		log.Fatal(err)
 	}
-	// create ksats for self to use
-	/*
-		if err := createStandardKsats(); err != nil {
-			log.Fatal(err)
-		}
-	*/
 	cmd, err := newCommand(os.Args)
 	if err != nil {
 		log.Fatal(err)

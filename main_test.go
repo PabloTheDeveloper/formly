@@ -29,16 +29,16 @@ func setUp() (string, error) {
 	if err != nil {
 		return dir, err
 	}
-	ksats := []ksat{
-		ksat{
+	ksats := []Ksat{
+		Ksat{
 			name:  "first",
 			usage: "some usage",
 		},
-		ksat{
+		Ksat{
 			name:  "second",
 			usage: "some more usage",
 		},
-		ksat{
+		Ksat{
 			name:  "hasP",
 			usage: "usage",
 		},
@@ -57,20 +57,20 @@ func setUp() (string, error) {
 	}
 	prompts := []prompt{
 		prompt{
-			ksatID:   3,
+			KsatID:   3,
 			sequence: 1,
 			flag:     "firstflag",
 			usage:    "some usage",
 		},
 		prompt{
-			ksatID:   3,
+			KsatID:   3,
 			sequence: 2,
 			flag:     "secondflag",
 			usage:    "some usage",
 		},
 	}
 	for _, item := range prompts {
-		if _, err := createPromptStmt.Exec(item.ksatID, item.sequence, item.flag, item.usage); err != nil {
+		if _, err := createPromptStmt.Exec(item.KsatID, item.sequence, item.flag, item.usage); err != nil {
 			return dir, err
 		}
 	}
@@ -83,16 +83,16 @@ func setUp() (string, error) {
 	}
 	sessions := []session{
 		{
-			ksatID:   3,
+			KsatID:   3,
 			createAt: time.Date(2000, 11, 17, 20, 34, 58, 651387237, time.UTC),
 		},
 		{
-			ksatID:   3,
+			KsatID:   3,
 			createAt: time.Date(2001, 11, 17, 20, 34, 58, 651387237, time.UTC),
 		},
 	}
 	for _, session := range sessions {
-		if _, err := createSessionStmt.Exec(session.ksatID, session.createAt); err != nil {
+		if _, err := createSessionStmt.Exec(session.KsatID, session.createAt); err != nil {
 			return dir, err
 		}
 	}

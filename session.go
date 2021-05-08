@@ -3,20 +3,19 @@ package main
 import "time"
 
 type session struct {
-	id, ksatID int64
+	id, KsatID int64
 	createAt   time.Time
 }
 
 func (session *session) dbInsert() error {
-	task := ksat{id: session.ksatID}
-	if err := task.getByID(); err != nil {
+	if _, err := GetKsatByID(session.KsatID); err != nil {
 		return err
 	}
 	stmt, err := db.Prepare("INSERT INTO sessions (ksat_id) VALUES (?)")
 	if err != nil {
 		return err
 	}
-	res, err := stmt.Exec(session.ksatID)
+	res, err := stmt.Exec(session.KsatID)
 	if err != nil {
 		return err
 	}
@@ -30,7 +29,7 @@ func (session *session) getByID() error {
 	return db.QueryRow(
 		"SELECT session_id, ksat_id, created_at FROM sessions WHERE session_id = ?",
 		session.id,
-	).Scan(&session.id, &session.ksatID, &session.createAt)
+	).Scan(&session.id, &session.KsatID, &session.createAt)
 }
 func (session *session) getEntriesByID() ([]entry, error) {
 	if err := session.getByID(); err != nil {

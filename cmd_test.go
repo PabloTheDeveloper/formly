@@ -20,7 +20,7 @@ func TestNewCommand(t *testing.T) {
 	}{
 		{
 			"valid command name (exist in db)", []string{"ksat", "first"}, expected{
-				&command{ksat: ksat{id: 1}},
+				&command{Ksat: Ksat{id: 1}},
 				nil,
 			},
 		},
@@ -51,11 +51,11 @@ func TestNewCommand(t *testing.T) {
 					tc.expected.command,
 				)
 			}
-			if given.command.ksat.id != tc.expected.command.ksat.id {
+			if given.command.Ksat.id != tc.expected.command.Ksat.id {
 				t.Fatalf(
-					"given command.ksat.id: %v\nexpected command.ksat.id: %v",
-					given.command.ksat.id,
-					tc.expected.command.ksat.id,
+					"given command.Ksat.id: %v\nexpected command.Ksat.id: %v",
+					given.command.Ksat.id,
+					tc.expected.command.Ksat.id,
 				)
 			}
 		})
@@ -74,7 +74,7 @@ func TestExecuteCommand(t *testing.T) {
 		{
 			"valid prompts and flags set (and exist in db)",
 			command{
-				ksat:     ksat{id: 3},
+				Ksat:     Ksat{id: 3},
 				FlagSet:  flag.NewFlagSet("hasP", flag.ExitOnError),
 				flagArgs: []string{"firstflag='data'", "secondflag='data'"},
 			},
@@ -86,7 +86,7 @@ func TestExecuteCommand(t *testing.T) {
 		{
 			"valid prompts but missing flag (and exist in db) (should work)",
 			command{
-				ksat:     ksat{id: 3},
+				Ksat:     Ksat{id: 3},
 				FlagSet:  flag.NewFlagSet("hasP", flag.ExitOnError),
 				flagArgs: []string{"firstflag='data'"},
 			},

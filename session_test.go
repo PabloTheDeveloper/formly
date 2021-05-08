@@ -14,7 +14,7 @@ func TestGetEntriesByID(t *testing.T) {
 	}{
 		{
 			"valid ID which contains 1 valid session",
-			session{id: 1, ksatID: 3},
+			session{id: 1, KsatID: 3},
 			[]entry{
 				{
 					id:        1,
@@ -33,13 +33,13 @@ func TestGetEntriesByID(t *testing.T) {
 		},
 		{
 			"valid ID but it has no session",
-			session{id: 2, ksatID: 3},
+			session{id: 2, KsatID: 3},
 			[]entry{},
 			nil,
 		},
 		{
 			"valid id for a session that does not exist",
-			session{id: 101010, ksatID: 3},
+			session{id: 101010, KsatID: 3},
 			nil,
 			sql.ErrNoRows,
 		},

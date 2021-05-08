@@ -6,7 +6,7 @@ import (
 )
 
 type prompt struct {
-	id, ksatID, sequence int64
+	id, KsatID, sequence int64
 	flag, usage          string
 }
 
@@ -75,7 +75,7 @@ func (prompt *prompt) getByID() error {
 		prompt.id,
 	).Scan(
 		&prompt.id,
-		&prompt.ksatID,
+		&prompt.KsatID,
 		&prompt.sequence,
 		&prompt.flag,
 		&prompt.usage,
@@ -85,8 +85,7 @@ func (prompt *prompt) dbInsert() error {
 	if err := prompt.validate(); err != nil {
 		return err
 	}
-	task := ksat{id: prompt.ksatID}
-	prompts, err := task.getPromptsByID()
+	prompts, err := GetPromptsByKsatID(prompt.KsatID)
 	if err != nil {
 		return err
 	}
@@ -103,7 +102,7 @@ func (prompt *prompt) dbInsert() error {
 	if err != nil {
 		return err
 	}
-	res, err := stmt.Exec(prompt.ksatID, prompt.sequence, prompt.flag, prompt.usage)
+	res, err := stmt.Exec(prompt.KsatID, prompt.sequence, prompt.flag, prompt.usage)
 	if err != nil {
 		return err
 	}

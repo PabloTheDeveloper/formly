@@ -6,7 +6,7 @@ import (
 )
 
 type command struct {
-	ksat
+	Ksat
 	session
 	*flag.FlagSet
 	flagArgs []string
@@ -22,21 +22,18 @@ func newCommand(args []string) (*command, error) {
 		return nil, helpMessage()
 	}
 	// args has len of >=1
-	cmd := &command{}
-	cmd.ksat.name = args[1]
-	if err := cmd.ksat.validateName(); err != nil {
+	ksat, err := GetKsatByName(args[1])
+	if err != nil {
 		return nil, err
 	}
-	if err := cmd.ksat.getByName(); err != nil {
-		return nil, err
-	}
-	cmd.FlagSet = flag.NewFlagSet(cmd.ksat.name, flag.ExitOnError)
-	// In test needs to make sure that this arg is set correctly
-	cmd.flagArgs = args[2:]
-	return cmd, nil
+	return &command{
+		Ksat:     ksat,
+		FlagSet:  flag.NewFlagSet(args[1], flag.ExitOnError),
+		flagArgs: args[2:],
+	}, nil
 }
 func (command *command) executeCommand() error {
-	prompts, err := command.ksat.getPromptsByID()
+	prompts, err := GetPromptsByKsatID(command.Ksat.id)
 	if err != nil {
 		return err
 	}
@@ -57,7 +54,7 @@ func (command *command) executeCommand() error {
 		return err
 	}
 
-	session := session{ksatID: command.ksat.id}
+	session := session{KsatID: command.Ksat.id}
 	if err := session.dbInsert(); err != nil {
 		return err
 	}
