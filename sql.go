@@ -2,6 +2,8 @@ package ksat
 
 import (
 	"database/sql"
+	"os"
+	"path/filepath"
 )
 
 type sqlModels struct {
@@ -11,7 +13,74 @@ type sqlModels struct {
 	sqlEntryModel
 }
 
-func newSQLEnv(db *sql.DB) *Env {
+// NewLocalSqLiteEnv ...
+func NewLocalSqLiteEnv() (*Env, error) {
+	schema := `
+		PRAGMA foreign_keys = ON;
+		CREATE TABLE IF NOT EXISTS forms (
+			form_id INTEGER PRIMARY KEY AUTOINCREMENT,
+			editable BOOL DEFAULT TRUE,
+			deletable BOOL DEFAULT TRUE,
+			name TEXT NOT NULL CHECK(length(name) >= 1 AND length(name) <= 16),
+			usage TEXT NOT NULL CHECK(length(usage) >= 5 AND length(usage) <= 252)
+		);
+
+		CREATE TABLE IF NOT EXISTS labels (
+			label_id INTEGER PRIMARY KEY AUTOINCREMENT,
+			form_id INTEGER NOT NULL,
+			position INTEGER NOT NULL CHECK(position >= 1),
+			repeatable BOOL DEFAULT FALSE,
+			editable BOOL DEFAULT TRUE,
+			deletable BOOL DEFAULT TRUE,
+			name TEXT NOT NULL CHECK(length(name) >= 1 AND length(name) <= 16),
+			usage TEXT NOT NULL CHECK(length(usage) >= 5 AND length(usage) <= 252),
+			FOREIGN KEY (form_id) REFERENCES forms (form_id) ON UPDATE CASCADE ON DELETE CASCADE
+		);
+
+		CREATE TABLE IF NOT EXISTS submissions (
+			submission_id INTEGER PRIMARY KEY AUTOINCREMENT,
+			form_id INTEGER NOT NULL,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (form_id) REFERENCES forms (form_id) ON UPDATE CASCADE ON DELETE CASCADE
+		);
+
+		CREATE TABLE IF NOT EXISTS entries (
+			entry_id INTEGER PRIMARY KEY AUTOINCREMENT,
+			label_id INTEGER NOT NULL,
+			submission_id INTEGER NOT NULL,
+			txt TEXT,
+			FOREIGN KEY (label_id) REFERENCES labels (label_id) ON UPDATE CASCADE ON DELETE CASCADE,
+			FOREIGN KEY (submission_id) REFERENCES submissions (submission_id) ON UPDATE CASCADE ON DELETE CASCADE
+		);
+
+		INSERT INTO forms(editable, deletable, name, usage)
+		SELECT FALSE, FALSE, 'create', 'subcommand to create other tasks'
+		WHERE NOT EXISTS(SELECT 1 FROM forms WHERE name = 'create');
+
+		INSERT INTO labels(form_id, position, editable, deletable, name, usage)
+		SELECT 1, 1, FALSE, FALSE, 'name', 'what the new form name will be'
+		WHERE NOT EXISTS(SELECT 1 FROM labels WHERE label_id = 1);
+
+		INSERT INTO labels(form_id, position, editable, deletable, name, usage)
+		SELECT 1, 2, FALSE, FALSE, 'labels', 'what the new labels will be. requiring this str format: {labels:[{name, usage, repeatable}, {...}, ...]}'
+		WHERE NOT EXISTS(SELECT 1 FROM labels WHERE label_id = 2);
+		`
+	homePath, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+	dataPath := filepath.Join(homePath, ".local", "share", "ksat")
+	if err := os.MkdirAll(dataPath, os.ModePerm); err != nil {
+		return nil, err
+	}
+	dbPath := filepath.Join(dataPath, "data.db")
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := db.Exec(schema); err != nil {
+		return nil, err
+	}
 	return &Env{
 		FormModel:       sqlFormModel{db: db},
 		LabelModel:      sqlLabelModel{db: db},
@@ -20,7 +89,7 @@ func newSQLEnv(db *sql.DB) *Env {
 		close: func() error {
 			return db.Close()
 		},
-	}
+	}, nil
 }
 
 type sqlFormModel struct {
@@ -73,8 +142,8 @@ type sqlLabelModel struct {
 	db *sql.DB
 }
 
-func (model sqlLabelModel) Create(formID, position int64, name, usage string) (Label, error) {
-	label := Label{formID: formID, position: position, name: name, usage: usage}
+func (model sqlLabelModel) Create(formID, position, repeatable int64, name, usage string) (Label, error) {
+	label := Label{formID: formID, position: position, repeatable: repeatable, name: name, usage: usage}
 	stmt, err := model.db.Prepare(
 		"INSERT INTO labels (form_id, position, name, usage) VALUES(?, ?, ?, ?)",
 	)
@@ -98,14 +167,14 @@ func (model sqlLabelModel) Create(formID, position int64, name, usage string) (L
 
 func (model sqlLabelModel) GetLabels(formID int64) ([]Label, error) {
 	labels := []Label{}
-	rows, err := model.db.Query("SELECT label_id, position, name, usage FROM labels where form_id = ? ORDER BY position ASC", formID)
+	rows, err := model.db.Query("SELECT label_id, position, repeatable, name, usage FROM labels where form_id = ? ORDER BY position ASC", formID)
 	if err != nil {
 		return labels, err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		label := Label{}
-		err := rows.Scan(&label.id, &label.position, &label.name, &label.usage)
+		err := rows.Scan(&label.id, &label.position, &label.repeatable, &label.name, &label.usage)
 		if err != nil {
 			return labels, err
 		}
