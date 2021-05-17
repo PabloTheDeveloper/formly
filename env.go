@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
+	"time"
 
 	// to support sqlite
 	_ "github.com/mattn/go-sqlite3"
@@ -23,24 +23,45 @@ const LocalSqlite storageOption = storageOption(localStorage | sqlite)
 
 // Env ...
 type Env struct {
-	local         local
-	FormAPI       FormModelAPI
-	FormValidator FormValidator
+	FormModel
+	LabelModel
+	SubmissionModel
+	EntryModel
+	close func() error
 }
 
-type local struct {
-	sqlDriver sqlDriver
+// FormModel ...
+type FormModel interface {
+	GetByName(name string) (Form, error)
+	GetByID(id int64) (Form, error)
+	GetAll() ([]Form, error)
+}
+
+// LabelModel ...
+type LabelModel interface {
+	Create(formID, position int64, name, usage string) (Label, error)
+	GetLabels(formID int64) ([]Label, error)
+}
+
+// SubmissionModel ...
+type SubmissionModel interface {
+	Create(formID int64) (Submission, error)
+}
+
+// EntryModel ...
+type EntryModel interface {
+	Create(submissionID, labelID int64, txt string) (Entry, error)
 }
 
 // NewEnv ...
-func NewEnv(op storageOption) (env *Env, err error) {
-	env = &Env{}
+func NewEnv(op storageOption) (*Env, error) {
 	switch op {
 	case LocalSqlite:
-		if err = env.newLocalSqLite(); err == nil {
-			env.FormAPI = env.local.sqlDriver.form
+		db, err := newLocalSqLite()
+		if err != nil {
+			return nil, err
 		}
-		return
+		return newSQLEnv(db), nil
 	default:
 		return nil, fmt.Errorf("unsupported storage option")
 	}
@@ -48,12 +69,9 @@ func NewEnv(op storageOption) (env *Env, err error) {
 
 // Close ...
 func (env *Env) Close() error {
-	if env.local.sqlDriver.db != nil {
-		return env.local.sqlDriver.db.Close()
-	}
-	return fmt.Errorf("nothing to close")
+	return env.close()
 }
-func (env *Env) newLocalSqLite() error {
+func newLocalSqLite() (*sql.DB, error) {
 	schema := `
 		PRAGMA foreign_keys = ON;
 		CREATE TABLE IF NOT EXISTS forms (
@@ -78,16 +96,16 @@ func (env *Env) newLocalSqLite() error {
 
 		CREATE TABLE IF NOT EXISTS submissions (
 			submission_id INTEGER PRIMARY KEY AUTOINCREMENT,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			form_id INTEGER NOT NULL,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY (form_id) REFERENCES forms (form_id) ON UPDATE CASCADE ON DELETE CASCADE
 		);
 
-		CREATE TABLE IF NOT EXISTS inputs (
-			input_id INTEGER PRIMARY KEY AUTOINCREMENT,
-			txt TEXT,
+		CREATE TABLE IF NOT EXISTS entries (
+			entry_id INTEGER PRIMARY KEY AUTOINCREMENT,
 			label_id INTEGER NOT NULL,
 			submission_id INTEGER NOT NULL,
+			txt TEXT,
 			FOREIGN KEY (label_id) REFERENCES labels (label_id) ON UPDATE CASCADE ON DELETE CASCADE,
 			FOREIGN KEY (submission_id) REFERENCES submissions (submission_id) ON UPDATE CASCADE ON DELETE CASCADE
 		);
@@ -143,22 +161,21 @@ func (env *Env) newLocalSqLite() error {
 		`
 	homePath, err := os.UserHomeDir()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	dataPath := filepath.Join(homePath, ".local", "share", "ksat")
 	if err := os.MkdirAll(dataPath, os.ModePerm); err != nil {
-		return err
+		return nil, err
 	}
 	dbPath := filepath.Join(dataPath, "data.db")
 	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if _, err := db.Exec(schema); err != nil {
-		return err
+		return nil, err
 	}
-	env.local = local{sqlDriver: newSQLDriver(db)}
-	return nil
+	return db, nil
 }
 
 // Form ...
@@ -183,8 +200,8 @@ func (form Form) GetUsage() string {
 }
 
 type Label struct {
-	id, position int64
-	name, usage  string
+	id, formID, position int64
+	name, usage          string
 }
 
 // GetID gets id from Label
@@ -202,24 +219,22 @@ func (label Label) GetUsage() string {
 	return label.usage
 }
 
-// FormModelAPI ...
-type FormModelAPI interface {
-	GetByName(name string) (Form, error)
-	GetByID(id int64) (Form, error)
-	GetForms() ([]Form, error)
-	GetLabels(ksatID int64) ([]Label, error)
+type Submission struct {
+	id, formID int64
+	createAt   time.Time
 }
 
-// FormValidator ...
-type FormValidator struct{}
-
-// ValidateName ...
-func (FormValidator) ValidateName(name string) bool {
-	return len(name) >= 1 && len(name) <= 6 &&
-		regexp.MustCompile(`^[a-zA-Z]+$`).MatchString(name)
+// GetID gets id from Submission
+func (submission Submission) GetID() int64 {
+	return submission.id
 }
 
-// ValidateUsage ...
-func (FormValidator) ValidateUsage(usage string) bool {
-	return len(usage) >= 5 && len(usage) <= 40
+type Entry struct {
+	id, labelID, submissionID int64
+	txt                       string
+}
+
+// GetID gets id from Entry
+func (entry Entry) GetID() int64 {
+	return entry.id
 }
