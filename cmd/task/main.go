@@ -5,23 +5,28 @@ import (
 	"errors"
 	stdFlag "flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
+	"strings"
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pablothedeveloper/ksat"
 )
 
 type command struct {
-	formID  int64
-	usage   string
-	fs      *stdFlag.FlagSet
-	rawArgs []string
-	flags   []flag
+	formID           int64
+	fs               *stdFlag.FlagSet
+	usage            string
+	flagArgSeperator string
+	rawArgs          []string
+	flags            []flag
 }
 type flag struct {
-	labelID            int64
-	name, usage, value string
+	labelID     int64
+	repeatable  bool
+	name, usage string
+	arg         string
 }
 
 var errNoArgNewCommand = errors.New("No arguments passed into newCommand")
@@ -32,7 +37,11 @@ func newCommand(env *ksat.Env, rawArgs ...string) (*command, error) {
 	if len(rawArgs) == 0 {
 		return nil, errNoArgNewCommand
 	}
-	cmd := &command{fs: stdFlag.NewFlagSet(rawArgs[0], stdFlag.ExitOnError), rawArgs: rawArgs[1:]}
+	cmd := &command{
+		fs:               stdFlag.NewFlagSet(rawArgs[0], stdFlag.ExitOnError),
+		flagArgSeperator: ",/",
+		rawArgs:          rawArgs[1:],
+	}
 
 	// load command
 	form, err := env.FormModel.GetByName(cmd.fs.Name())
@@ -51,9 +60,18 @@ func newCommand(env *ksat.Env, rawArgs ...string) (*command, error) {
 		return nil, err
 	}
 	for i, label := range labels {
-		cmd.flags = append(cmd.flags, flag{labelID: label.GetID(), name: label.GetName(), usage: label.GetUsage(), value: ""})
+		cmd.flags = append(
+			cmd.flags,
+			flag{
+				labelID:    label.GetID(),
+				repeatable: label.GetRepeatable(),
+				name:       label.GetName(),
+				usage:      label.GetUsage(),
+				arg:        "",
+			},
+		)
 		cmd.fs.StringVar(
-			&cmd.flags[i].value,
+			&cmd.flags[i].arg,
 			cmd.flags[i].name,
 			"",
 			cmd.flags[i].usage,
@@ -62,50 +80,70 @@ func newCommand(env *ksat.Env, rawArgs ...string) (*command, error) {
 	return cmd, nil
 }
 
-var errUnitializedCommand = errors.New("command was created via 'newCommand'")
+var errRepeatableFlagSeperator = errors.New("flag contains a seperator while not being repeatable")
 
-func (cmd *command) process(env *ksat.Env) error {
-	// check command was initialized correctly
-	if cmd.formID == 0 || cmd.fs == nil || cmd.flags == nil {
-		return errUnitializedCommand
-	}
-	// fill in flags from command line
-	cmd.fs.Parse(cmd.rawArgs)
-
-	submission, err := env.SubmissionModel.Create(cmd.formID)
-	if err != nil {
+// parse gets flags from command and insert into the command struct. activates interactivity mode when no flags are passed in.
+func (cmd *command) parse() error {
+	if err := cmd.fs.Parse(cmd.rawArgs); err != nil {
 		return err
 	}
-
-	// interactive mode to assign flags's values
-	if cmd.fs.NFlag() == 0 {
-		for i := 0; i < len(cmd.flags); i++ {
-			scanner := bufio.NewScanner(os.Stdin)
-			fmt.Printf("(flag usage)\n%s\n\n(flag name)\n%s:\n", cmd.flags[i].usage, cmd.flags[i].name)
-			scanner.Scan()
-			cmd.flags[i].value = scanner.Text()
-			fmt.Println()
+	for _, flag := range cmd.flags {
+		if !flag.repeatable && strings.Contains(flag.arg, cmd.flagArgSeperator) {
+			return errRepeatableFlagSeperator
 		}
 	}
-
-	// create entries through flags
-	for _, flag := range cmd.flags {
-		entry, err := env.EntryModel.Create(submission.GetID(), flag.labelID, flag.value)
-		if err != nil {
+	if cmd.fs.NFlag() != 0 {
+		return nil
+	}
+	for i, flag := range cmd.flags {
+		s := bufio.NewScanner(os.Stdin)
+		inputs := []string{}
+		prompt := flag.name + ":\n"
+		for fmt.Print(prompt); s.Scan(); fmt.Print(prompt) {
+			txt := s.Text()
+			if strings.Contains(txt, cmd.flagArgSeperator) {
+				fmt.Printf("input cannot contain '%s'\n", cmd.flagArgSeperator)
+				continue
+			}
+			if txt == "" {
+				break
+			}
+			inputs = append(inputs, txt)
+			if !flag.repeatable {
+				break
+			}
+		}
+		cmd.flags[i].arg = strings.Join(inputs, cmd.flagArgSeperator)
+		if err := s.Err(); err != io.EOF {
 			return err
 		}
-		fmt.Println("entry:", entry)
 	}
 	return nil
 }
 
-type helpable interface {
-	GetName() string
-	GetUsage() string
+// execute submits the form and creates a submission and all entries.
+func (cmd *command) execute(env *ksat.Env) error {
+	submission, err := env.SubmissionModel.Create(cmd.formID)
+	if err != nil {
+		return err
+	}
+	for _, flag := range cmd.flags {
+		if flag.arg == "" {
+			continue
+		}
+		fmt.Println(strings.Split(flag.arg, cmd.flagArgSeperator))
+		for _, arg := range strings.Split(flag.arg, cmd.flagArgSeperator) {
+			entry, err := env.EntryModel.Create(submission.GetID(), flag.labelID, arg)
+			if err != nil {
+				return err
+			}
+			fmt.Println("entry:", entry)
+		}
+	}
+	return nil
 }
-
 func main() {
-	env, err := ksat.NewEnv(ksat.LocalSqlite)
+	env, err := ksat.NewLocalSqLiteEnv()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -117,15 +155,11 @@ func main() {
 		if err != nil {
 			log.Fatal("main:", err)
 		}
-		helpables := make([]helpable, len(forms))
-		for i, form := range forms {
-			helpables[i] = form
-		}
-		if len(helpables) == 0 {
+		if len(forms) == 0 {
 			fmt.Println("main: no subcommands found...")
 			return
 		}
-		for _, item := range helpables {
+		for _, item := range forms {
 			fmt.Printf("%s\n	-%s\n", item.GetName(), item.GetUsage())
 		}
 	}
@@ -136,7 +170,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := cmd.process(env); err != nil {
+	if err := cmd.parse(); err != nil {
+		log.Fatal(err)
+	}
+	if err := cmd.execute(env); err != nil {
 		log.Fatal(err)
 	}
 }
