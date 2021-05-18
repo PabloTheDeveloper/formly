@@ -132,22 +132,21 @@ func (cmd *command) submit(env *ksat.Env) error {
 			continue
 		}
 		for _, arg := range strings.Split(flag.arg, cmd.flagArgSeperator) {
-			entry, err := env.EntryModel.Create(submission.GetID(), flag.labelID, arg)
+			_, err := env.EntryModel.Create(submission.GetID(), flag.labelID, arg)
 			if err != nil {
 				return err
 			}
-			fmt.Println("entry:", entry)
 		}
 	}
 	return nil
 }
 
-type jsonLabel struct {
-	Repeatable  bool // `json:"omitempty"`
-	Name, Usage string
-}
-
 func create(cmd *command, env *ksat.Env) error {
+	type jsonLabel struct {
+		Repeatable  bool // `json:"omitempty"`
+		Name, Usage string
+	}
+
 	// validate form
 	if err := ksat.ValidateName(cmd.flags[0].arg); err != nil {
 		fmt.Println("err:" + cmd.flags[0].arg + "'")
@@ -186,6 +185,41 @@ func create(cmd *command, env *ksat.Env) error {
 	return nil
 }
 
+func read(cmd *command, env *ksat.Env) error {
+	if err := ksat.ValidateName(cmd.flags[0].arg); err != nil {
+		fmt.Println("err:" + cmd.flags[0].arg)
+		return err
+	}
+	form, err := env.FormModel.GetByName(cmd.flags[0].arg)
+	if err != nil {
+		return err
+	}
+	submissions, err := env.SubmissionModel.GetSubmissions(form.GetID())
+	if err != nil {
+		return err
+	}
+	labels, err := env.LabelModel.GetLabels(form.GetID())
+	if err != nil {
+		return err
+	}
+	fmt.Printf("reading submissions for %s\n", form.GetName())
+	for _, submission := range submissions {
+		fmt.Println(fmt.Sprintf("\nsubmission(%v) time:%v", submission.GetID(), submission.GetCreateAt()))
+		for _, label := range labels {
+			entries, err := env.GetEntries(submission.GetID(), label.GetID())
+			if err != nil {
+				return err
+			}
+			if len(entries) == 0 {
+				continue
+			}
+			for _, entry := range entries {
+				fmt.Println(fmt.Sprintf("\t%s: %s", label.GetName(), entry.GetTxt()))
+			}
+		}
+	}
+	return nil
+}
 func main() {
 	env, err := ksat.NewLocalSqLiteEnv()
 	if err != nil {
@@ -224,6 +258,8 @@ func main() {
 	switch cmd.fs.Name() {
 	case "create":
 		err = create(cmd, env)
+	case "read":
+		err = read(cmd, env)
 	}
 	if err != nil {
 		log.Fatal(err)

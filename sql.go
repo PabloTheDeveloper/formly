@@ -46,15 +46,15 @@ func NewLocalSqLiteEnv() (*Env, error) {
 
 		CREATE TABLE IF NOT EXISTS entries (
 			entry_id INTEGER PRIMARY KEY AUTOINCREMENT,
-			label_id INTEGER NOT NULL,
 			submission_id INTEGER NOT NULL,
+			label_id INTEGER NOT NULL,
 			txt TEXT,
 			FOREIGN KEY (label_id) REFERENCES labels (label_id) ON UPDATE CASCADE ON DELETE CASCADE,
 			FOREIGN KEY (submission_id) REFERENCES submissions (submission_id) ON UPDATE CASCADE ON DELETE CASCADE
 		);
 
 		INSERT INTO forms(editable, deleteable, name, usage)
-		SELECT FALSE, FALSE, 'create', 'subcommand to create other tasks'
+		SELECT FALSE, FALSE, 'create', 'subcommand to create other forms'
 		WHERE NOT EXISTS(SELECT 1 FROM forms WHERE name = 'create');
 
 		INSERT INTO labels(form_id, position, editable, deleteable, name, usage)
@@ -68,6 +68,14 @@ func NewLocalSqLiteEnv() (*Env, error) {
 		INSERT INTO labels(form_id, position, editable, deleteable, name, usage)
 		SELECT 1, 3, FALSE, FALSE, 'labels', ' what the new labels will be. requiring this str format: [{name:newName, usage:newUsage, repeatable:1_Or_0_default_is_0}, {...}, ...]'
 		WHERE NOT EXISTS(SELECT 1 FROM labels WHERE label_id = 3);
+
+		INSERT INTO forms(editable, deleteable, name, usage)
+		SELECT FALSE, FALSE, 'read', 'subcommand to read form entries'
+		WHERE NOT EXISTS(SELECT 1 FROM forms WHERE name = 'read');
+
+		INSERT INTO labels(form_id, position, editable, deleteable, name, usage)
+		SELECT 2, 1, FALSE, FALSE, 'name', 'what the new form name will be'
+		WHERE NOT EXISTS(SELECT 1 FROM labels WHERE label_id = 4);
 		`
 	/*
 
@@ -197,7 +205,7 @@ func (model sqlLabelModel) Create(formID, position int64, repeatable bool, name,
 
 func (model sqlLabelModel) GetLabels(formID int64) ([]Label, error) {
 	labels := []Label{}
-	rows, err := model.db.Query("SELECT label_id, position, repeatable, name, usage FROM labels where form_id = ? ORDER BY position ASC", formID)
+	rows, err := model.db.Query("SELECT label_id, position, repeatable, name, usage FROM labels WHERE form_id = ? ORDER BY position ASC", formID)
 	if err != nil {
 		return labels, err
 	}
@@ -238,6 +246,27 @@ func (model sqlSubmissionModel) Create(formID int64) (Submission, error) {
 	}
 	return submission, nil
 }
+func (model sqlSubmissionModel) GetSubmissions(formID int64) ([]Submission, error) {
+	submissions := []Submission{}
+	rows, err := model.db.Query(
+		"SELECT submission_id, form_id, created_at FROM submissions WHERE form_id = ? ORDER BY created_at ASC",
+		formID,
+	)
+	if err != nil {
+		return submissions, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		submission := Submission{}
+		err := rows.Scan(&submission.id, &submission.formID, &submission.createAt)
+		if err != nil {
+			return submissions, err
+		}
+		submissions = append(submissions, submission)
+	}
+	err = rows.Err()
+	return submissions, err
+}
 
 type sqlEntryModel struct {
 	db *sql.DB
@@ -262,4 +291,28 @@ func (model sqlEntryModel) Create(submissionID, labelID int64, txt string) (Entr
 		return Entry{}, err
 	}
 	return entry, nil
+}
+
+func (model sqlEntryModel) GetEntries(submissionID, labelID int64) ([]Entry, error) {
+	entries := []Entry{}
+	rows, err := model.db.Query(
+		`SELECT entry_id, submission_id, label_id, txt
+		FROM entries WHERE submission_id = ? AND label_id = ?`,
+		submissionID,
+		labelID,
+	)
+	if err != nil {
+		return entries, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		entry := Entry{}
+		err := rows.Scan(&entry.id, &entry.submissionID, &entry.labelID, &entry.txt)
+		if err != nil {
+			return entries, err
+		}
+		entries = append(entries, entry)
+	}
+	err = rows.Err()
+	return entries, err
 }

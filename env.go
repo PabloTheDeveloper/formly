@@ -124,9 +124,15 @@ func (submission Submission) GetID() int64 {
 	return submission.id
 }
 
+// GetCreateAt gets createAt from Submission
+func (submission Submission) GetCreateAt() time.Time {
+	return submission.createAt
+}
+
 // SubmissionModel ...
 type SubmissionModel interface {
 	Create(formID int64) (Submission, error)
+	GetSubmissions(formID int64) ([]Submission, error)
 }
 
 // Entry ...
@@ -140,7 +146,13 @@ func (entry Entry) GetID() int64 {
 	return entry.id
 }
 
+// GetTxt gets txt from Entry
+func (entry Entry) GetTxt() string {
+	return entry.txt
+}
+
 // EntryModel ...
 type EntryModel interface {
 	Create(submissionID, labelID int64, txt string) (Entry, error)
+	GetEntries(submissionID, labeID int64) ([]Entry, error)
 }
