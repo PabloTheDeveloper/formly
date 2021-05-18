@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"errors"
 	stdFlag "flag"
 	"fmt"
@@ -102,7 +103,6 @@ func (cmd *command) parse() error {
 		for fmt.Print(prompt); s.Scan(); fmt.Print(prompt) {
 			txt := s.Text()
 			if strings.Contains(txt, cmd.flagArgSeperator) {
-				fmt.Printf("input cannot contain '%s'\n", cmd.flagArgSeperator)
 				continue
 			}
 			if txt == "" {
@@ -114,15 +114,15 @@ func (cmd *command) parse() error {
 			}
 		}
 		cmd.flags[i].arg = strings.Join(inputs, cmd.flagArgSeperator)
-		if err := s.Err(); err != io.EOF {
+		if err := s.Err(); err != io.EOF && err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// execute submits the form and creates a submission and all entries.
-func (cmd *command) execute(env *ksat.Env) error {
+// execute submits the form and creates a submission and all entries. All entries with empty text are not submitted
+func (cmd *command) submit(env *ksat.Env) error {
 	submission, err := env.SubmissionModel.Create(cmd.formID)
 	if err != nil {
 		return err
@@ -131,7 +131,6 @@ func (cmd *command) execute(env *ksat.Env) error {
 		if flag.arg == "" {
 			continue
 		}
-		fmt.Println(strings.Split(flag.arg, cmd.flagArgSeperator))
 		for _, arg := range strings.Split(flag.arg, cmd.flagArgSeperator) {
 			entry, err := env.EntryModel.Create(submission.GetID(), flag.labelID, arg)
 			if err != nil {
@@ -142,6 +141,51 @@ func (cmd *command) execute(env *ksat.Env) error {
 	}
 	return nil
 }
+
+type jsonLabel struct {
+	Repeatable  bool // `json:"omitempty"`
+	Name, Usage string
+}
+
+func create(cmd *command, env *ksat.Env) error {
+	// validate form
+	if err := ksat.ValidateName(cmd.flags[0].arg); err != nil {
+		fmt.Println("err:" + cmd.flags[0].arg + "'")
+		return err
+	}
+	if err := ksat.ValidateUsage(cmd.flags[1].arg); err != nil {
+		fmt.Println("err:", cmd.flags[1].arg)
+		return err
+	}
+
+	// validate labels
+	var labels []jsonLabel
+	if err := json.Unmarshal([]byte(cmd.flags[2].arg), &labels); err != nil {
+		return err
+	}
+	for _, label := range labels {
+		if err := ksat.ValidateName(label.Name); err != nil {
+			fmt.Println("lerr:", label.Name)
+			return err
+		}
+		if err := ksat.ValidateUsage(label.Usage); err != nil {
+			fmt.Println("lerr:", label.Usage)
+			return err
+		}
+	}
+	// create form and label
+	form, err := env.FormModel.Create(cmd.flags[0].arg, cmd.flags[1].arg)
+	if err != nil {
+		return err
+	}
+	for i, label := range labels {
+		if _, err := env.LabelModel.Create(form.GetID(), int64(i+1), label.Repeatable, label.Name, label.Usage); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func main() {
 	env, err := ksat.NewLocalSqLiteEnv()
 	if err != nil {
@@ -170,10 +214,18 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	if err := cmd.parse(); err != nil {
 		log.Fatal(err)
 	}
-	if err := cmd.execute(env); err != nil {
+	if err := cmd.submit(env); err != nil {
+		log.Fatal(err)
+	}
+	switch cmd.fs.Name() {
+	case "create":
+		err = create(cmd, env)
+	}
+	if err != nil {
 		log.Fatal(err)
 	}
 }
