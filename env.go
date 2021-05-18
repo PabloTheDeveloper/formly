@@ -1,6 +1,8 @@
 package ksat
 
 import (
+	"errors"
+	"regexp"
 	"time"
 
 	// to support sqlite
@@ -50,6 +52,35 @@ type FormModel interface {
 	GetAll() ([]Form, error)
 }
 
+// ErrInvalidLengthName ...
+var ErrInvalidLengthName error = errors.New("name's length is not between 1 - 16 characters long")
+
+// ErrNameIsNotAWord ...
+var ErrNameIsNotAWord error = errors.New("name is not composed only of letters")
+
+// ValidateName ...
+func ValidateName(name string) error {
+	if !(len(name) >= 1 && len(name) <= 16) {
+		return ErrInvalidLengthName
+	}
+	if !regexp.MustCompile(`^[a-zA-Z]+$`).MatchString(name) {
+		return ErrNameIsNotAWord
+	}
+	return nil
+}
+
+// ErrInvalidLengthUsage ...
+var ErrInvalidLengthUsage error = errors.New("name's length is not between 5 - 252 characters long")
+
+// ValidateUsage ...
+func ValidateUsage(usage string) error {
+	if !(len(usage) >= 5 && len(usage) <= 252) {
+		return ErrInvalidLengthUsage
+	}
+	return nil
+}
+
+// Label ...
 type Label struct {
 	id, formID, position int64
 	repeatable           bool
@@ -82,6 +113,7 @@ type LabelModel interface {
 	GetLabels(formID int64) ([]Label, error)
 }
 
+// Submission ...
 type Submission struct {
 	id, formID int64
 	createAt   time.Time
@@ -97,6 +129,7 @@ type SubmissionModel interface {
 	Create(formID int64) (Submission, error)
 }
 
+// Entry ...
 type Entry struct {
 	id, labelID, submissionID int64
 	txt                       string
