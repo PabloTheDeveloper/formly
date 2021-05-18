@@ -20,7 +20,7 @@ func NewLocalSqLiteEnv() (*Env, error) {
 		CREATE TABLE IF NOT EXISTS forms (
 			form_id INTEGER PRIMARY KEY AUTOINCREMENT,
 			editable BOOL DEFAULT TRUE,
-			deletable BOOL DEFAULT TRUE,
+			deleteable BOOL DEFAULT TRUE,
 			name TEXT NOT NULL CHECK(length(name) >= 1 AND length(name) <= 16),
 			usage TEXT NOT NULL CHECK(length(usage) >= 5 AND length(usage) <= 252)
 		);
@@ -31,7 +31,7 @@ func NewLocalSqLiteEnv() (*Env, error) {
 			position INTEGER NOT NULL CHECK(position >= 1),
 			repeatable BOOL DEFAULT FALSE,
 			editable BOOL DEFAULT TRUE,
-			deletable BOOL DEFAULT TRUE,
+			deleteable BOOL DEFAULT TRUE,
 			name TEXT NOT NULL CHECK(length(name) >= 1 AND length(name) <= 16),
 			usage TEXT NOT NULL CHECK(length(usage) >= 5 AND length(usage) <= 252),
 			FOREIGN KEY (form_id) REFERENCES forms (form_id) ON UPDATE CASCADE ON DELETE CASCADE
@@ -53,18 +53,26 @@ func NewLocalSqLiteEnv() (*Env, error) {
 			FOREIGN KEY (submission_id) REFERENCES submissions (submission_id) ON UPDATE CASCADE ON DELETE CASCADE
 		);
 
-		INSERT INTO forms(editable, deletable, name, usage)
+		INSERT INTO forms(editable, deleteable, name, usage)
 		SELECT FALSE, FALSE, 'create', 'subcommand to create other tasks'
 		WHERE NOT EXISTS(SELECT 1 FROM forms WHERE name = 'create');
 
-		INSERT INTO labels(form_id, position, editable, deletable, name, usage)
+		INSERT INTO labels(form_id, position, editable, deleteable, name, usage)
 		SELECT 1, 1, FALSE, FALSE, 'name', 'what the new form name will be'
 		WHERE NOT EXISTS(SELECT 1 FROM labels WHERE label_id = 1);
 
-		INSERT INTO labels(form_id, position, editable, deletable, name, usage)
-		SELECT 1, 2, FALSE, FALSE, 'labels', 'what the new labels will be. requiring this str format: {labels:[{name, usage, repeatable}, {...}, ...]}'
+		INSERT INTO labels(form_id, position, editable, deleteable, name, usage)
+		SELECT 1, 2, FALSE, FALSE, 'usage', 'what the new form usage will be'
 		WHERE NOT EXISTS(SELECT 1 FROM labels WHERE label_id = 2);
+
+		INSERT INTO labels(form_id, position, editable, deleteable, name, usage)
+		SELECT 1, 3, FALSE, FALSE, 'labels', ' what the new labels will be. requiring this str format: [{name:newName, usage:newUsage, repeatable:1_Or_0_default_is_0}, {...}, ...]'
+		WHERE NOT EXISTS(SELECT 1 FROM labels WHERE label_id = 3);
 		`
+	/*
+
+
+	 */
 	homePath, err := os.UserHomeDir()
 	if err != nil {
 		return nil, err
@@ -96,6 +104,28 @@ type sqlFormModel struct {
 	db *sql.DB
 }
 
+func (model sqlFormModel) Create(name, usage string) (Form, error) {
+	form := Form{name: name, usage: usage}
+	stmt, err := model.db.Prepare(
+		"INSERT INTO forms (name, usage) VALUES(?, ?)",
+	)
+	if err != nil {
+		return Form{}, err
+	}
+	res, err := stmt.Exec(form.name, form.usage)
+	if err != nil {
+		return Form{}, err
+	}
+	form.id, err = res.LastInsertId()
+	if err != nil {
+		return Form{}, err
+	}
+	_, err = res.RowsAffected()
+	if err != nil {
+		return Form{}, err
+	}
+	return form, nil
+}
 func (model sqlFormModel) GetByName(name string) (Form, error) {
 	// return len(name) >= 1 && len(name) <= 6 && regexp.MustCompile(`^[a-zA-Z]+$`).MatchString(name)
 	form := Form{}
@@ -142,15 +172,15 @@ type sqlLabelModel struct {
 	db *sql.DB
 }
 
-func (model sqlLabelModel) Create(formID, position, repeatable int64, name, usage string) (Label, error) {
+func (model sqlLabelModel) Create(formID, position int64, repeatable bool, name, usage string) (Label, error) {
 	label := Label{formID: formID, position: position, repeatable: repeatable, name: name, usage: usage}
 	stmt, err := model.db.Prepare(
-		"INSERT INTO labels (form_id, position, name, usage) VALUES(?, ?, ?, ?)",
+		"INSERT INTO labels (form_id, position, repeatable, name, usage) VALUES(?, ?, ?, ?, ?)",
 	)
 	if err != nil {
 		return Label{}, err
 	}
-	res, err := stmt.Exec(label.formID, label.position, label.name, label.usage)
+	res, err := stmt.Exec(label.formID, label.position, label.repeatable, label.name, label.usage)
 	if err != nil {
 		return Label{}, err
 	}

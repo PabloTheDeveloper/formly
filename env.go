@@ -44,14 +44,16 @@ func (form Form) GetUsage() string {
 
 // FormModel ...
 type FormModel interface {
+	Create(name, usage string) (Form, error)
 	GetByName(name string) (Form, error)
 	GetByID(id int64) (Form, error)
 	GetAll() ([]Form, error)
 }
 
 type Label struct {
-	id, formID, position, repeatable int64
-	name, usage                      string
+	id, formID, position int64
+	repeatable           bool
+	name, usage          string
 }
 
 // GetID gets id from Label
@@ -71,12 +73,12 @@ func (label Label) GetUsage() string {
 
 // GetRepeatable gets repeatable from Label
 func (label Label) GetRepeatable() bool {
-	return label.repeatable != 0
+	return label.repeatable
 }
 
 // LabelModel ...
 type LabelModel interface {
-	Create(formID, position, repeatable int64, name, usage string) (Label, error)
+	Create(formID, position int64, repeatable bool, name, usage string) (Label, error)
 	GetLabels(formID int64) ([]Label, error)
 }
 
