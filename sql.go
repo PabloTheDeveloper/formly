@@ -2,6 +2,7 @@ package ksat
 
 import (
 	"database/sql"
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -54,8 +55,8 @@ func NewLocalSqLiteEnv() (*Env, error) {
 		);
 
 		INSERT INTO forms(editable, deleteable, name, usage)
-		SELECT FALSE, FALSE, 'create', 'subcommand to create other forms'
-		WHERE NOT EXISTS(SELECT 1 FROM forms WHERE name = 'create');
+		SELECT FALSE, FALSE, 'new', 'subcommand to create other forms'
+		WHERE NOT EXISTS(SELECT 1 FROM forms WHERE name = 'new');
 
 		INSERT INTO labels(form_id, position, editable, deleteable, name, usage)
 		SELECT 1, 1, FALSE, FALSE, 'name', 'what the new form name will be'
@@ -70,12 +71,20 @@ func NewLocalSqLiteEnv() (*Env, error) {
 		WHERE NOT EXISTS(SELECT 1 FROM labels WHERE label_id = 3);
 
 		INSERT INTO forms(editable, deleteable, name, usage)
-		SELECT FALSE, FALSE, 'read', 'subcommand to read form entries'
-		WHERE NOT EXISTS(SELECT 1 FROM forms WHERE name = 'read');
+		SELECT FALSE, FALSE, 'view', 'subcommand to read form entries'
+		WHERE NOT EXISTS(SELECT 1 FROM forms WHERE name = 'view');
 
 		INSERT INTO labels(form_id, position, editable, deleteable, name, usage)
 		SELECT 2, 1, FALSE, FALSE, 'name', 'what the new form name will be'
 		WHERE NOT EXISTS(SELECT 1 FROM labels WHERE label_id = 4);
+
+		INSERT INTO forms(editable, deleteable, name, usage)
+		SELECT FALSE, FALSE, 'remove', 'subcommand to delete form, its labels, and entries'
+		WHERE NOT EXISTS(SELECT 1 FROM forms WHERE name = 'remove');
+
+		INSERT INTO labels(form_id, position, editable, deleteable, name, usage)
+		SELECT 3, 1, FALSE, FALSE, 'name', 'which form to delete'
+		WHERE NOT EXISTS(SELECT 1 FROM labels WHERE label_id = 5);
 		`
 	/*
 
@@ -135,7 +144,6 @@ func (model sqlFormModel) Create(name, usage string) (Form, error) {
 	return form, nil
 }
 func (model sqlFormModel) GetByName(name string) (Form, error) {
-	// return len(name) >= 1 && len(name) <= 6 && regexp.MustCompile(`^[a-zA-Z]+$`).MatchString(name)
 	form := Form{}
 	err := model.db.QueryRow(
 		"SELECT form_id, name, usage FROM forms WHERE name = ?",
@@ -174,6 +182,31 @@ func (model sqlFormModel) GetAll() ([]Form, error) {
 	}
 	err = rows.Err()
 	return forms, err
+}
+
+func (model sqlFormModel) DeleteByName(name string) error {
+	isDeletable := false
+	err := model.db.QueryRow(
+		"SELECT deleteable FROM forms WHERE name = ?",
+		name,
+	).Scan(&isDeletable)
+	if err == sql.ErrNoRows {
+		return fmt.Errorf("form '%s' is not found", name)
+	}
+	if err != nil {
+		return err
+	}
+	if !isDeletable {
+		return fmt.Errorf("form '%s' is not deletable. It is a built-in of the application", name)
+	}
+	stmt, err := model.db.Prepare("DELETE FROM forms WHERE name=? AND deleteable=TRUE")
+	if err != nil {
+		return err
+	}
+	if _, err := stmt.Exec(name); err != nil {
+		return err
+	}
+	return nil
 }
 
 type sqlLabelModel struct {
@@ -242,6 +275,12 @@ func (model sqlSubmissionModel) Create(formID int64) (Submission, error) {
 	}
 	_, err = res.RowsAffected()
 	if err != nil {
+		return Submission{}, err
+	}
+	if err := model.db.QueryRow(
+		"SELECT created_at FROM submissions WHERE submission_id = ?",
+		submission.id,
+	).Scan(&submission.createAt); err != nil {
 		return Submission{}, err
 	}
 	return submission, nil

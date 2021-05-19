@@ -121,10 +121,12 @@ func (cmd *command) parse() error {
 	return nil
 }
 
-// execute submits the form and creates a submission and all entries. All entries with empty text are not submitted
-func (cmd *command) submit(env *ksat.Env) error {
+// submitForm execute submits the form and creates a submission and all entries. All entries with empty text are not submitted
+func (cmd *command) submitForm(env *ksat.Env) error {
 	submission, err := env.SubmissionModel.Create(cmd.formID)
-	fmt.Println(fmt.Sprintf("\nsubmission(%v) time:%v", submission.GetID(), submission.GetCreateAt()))
+	fmt.Println(
+		fmt.Sprintf("form '%s' submitted at time:%v", cmd.fs.Name(), submission.GetCreateAt()),
+	)
 	if err != nil {
 		return err
 	}
@@ -137,15 +139,14 @@ func (cmd *command) submit(env *ksat.Env) error {
 			if err != nil {
 				return err
 			}
-			fmt.Println(fmt.Sprintf("\t%s: %s", flag.name, entry.GetTxt()))
+			fmt.Print(fmt.Sprintf("\t%s: %s", flag.name, entry.GetTxt()))
 		}
 	}
-	fmt.Print("\n")
 	return nil
 }
 
-// creates a new form as a subcommand. If the labels flag is empty, creates it without labels
-func create(cmd *command, env *ksat.Env) error {
+// newForm a new form as a subcommand. If the labels flag is empty, creates it without labels
+func newForm(cmd *command, env *ksat.Env) error {
 	type jsonLabel struct {
 		Repeatable  bool // `json:"omitempty"`
 		Name, Usage string
@@ -192,15 +193,21 @@ func create(cmd *command, env *ksat.Env) error {
 		return err
 	}
 	for i, label := range labels {
-		if _, err := env.LabelModel.Create(form.GetID(), int64(i+1), label.Repeatable, label.Name, label.Usage); err != nil {
+		if _, err := env.LabelModel.Create(
+			form.GetID(),
+			int64(i+1),
+			label.Repeatable,
+			label.Name,
+			label.Usage,
+		); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// reads a form's entries. Ensure that form name passed in is valid.
-func read(cmd *command, env *ksat.Env) error {
+// viewForm views a form's entries. Ensure that form name passed in is valid.
+func viewForm(cmd *command, env *ksat.Env) error {
 	if err := ksat.ValidateName(cmd.flags[0].arg); err != nil {
 		fmt.Println("read:" + cmd.flags[0].arg)
 		return err
@@ -208,6 +215,9 @@ func read(cmd *command, env *ksat.Env) error {
 	form, err := env.FormModel.GetByName(cmd.flags[0].arg)
 	if err != nil {
 		return err
+	}
+	if form == (ksat.Form{}) {
+		return fmt.Errorf("form '%s' does not exist", cmd.fs.Name())
 	}
 	submissions, err := env.SubmissionModel.GetSubmissions(form.GetID())
 	if err != nil {
@@ -217,9 +227,12 @@ func read(cmd *command, env *ksat.Env) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("reading submissions for %s\n", form.GetName())
+	if len(submissions) == 0 {
+		fmt.Println("no submission for this form yet")
+		return nil
+	}
 	for _, submission := range submissions {
-		fmt.Println(fmt.Sprintf("\nsubmission(%v) time:%v", submission.GetID(), submission.GetCreateAt()))
+		fmt.Printf("submission:%v\n", submission.GetCreateAt())
 		for _, label := range labels {
 			entries, err := env.GetEntries(submission.GetID(), label.GetID())
 			if err != nil {
@@ -229,12 +242,27 @@ func read(cmd *command, env *ksat.Env) error {
 				continue
 			}
 			for _, entry := range entries {
-				fmt.Println(fmt.Sprintf("\t%s: %s", label.GetName(), entry.GetTxt()))
+				fmt.Printf("\t%s: %s \n", label.GetName(), entry.GetTxt())
 			}
 		}
 	}
 	return nil
 }
+
+// removeForm remove a form, labels, and entries. Ensure that form name passed in is valid.
+func removeForm(cmd *command, env *ksat.Env) error {
+	if err := ksat.ValidateName(cmd.flags[0].arg); err != nil {
+		fmt.Println("read:" + cmd.flags[0].arg)
+		return err
+	}
+	if err := env.FormModel.DeleteByName(cmd.flags[0].arg); err != nil {
+		return err
+	}
+	fmt.Printf("removed form '%s' successfully!\n", cmd.fs.Name())
+	return nil
+}
+
+// main program
 func main() {
 	env, err := ksat.NewLocalSqLiteEnv()
 	if err != nil {
@@ -267,16 +295,23 @@ func main() {
 	if err := cmd.parse(); err != nil {
 		log.Fatal(err)
 	}
-	if err := cmd.submit(env); err != nil {
-		log.Fatal(err)
-	}
+	// process commands
 	switch cmd.fs.Name() {
-	case "create":
-		err = create(cmd, env)
-	case "read":
-		err = read(cmd, env)
-	}
-	if err != nil {
-		log.Fatal(err)
+	case "new":
+		if err := newForm(cmd, env); err != nil {
+			log.Fatal(err)
+		}
+	case "view":
+		if err := viewForm(cmd, env); err != nil {
+			log.Fatal(err)
+		}
+	case "remove":
+		if err := removeForm(cmd, env); err != nil {
+			log.Fatal(err)
+		}
+	default:
+		if err := cmd.submitForm(env); err != nil {
+			log.Fatal(err)
+		}
 	}
 }

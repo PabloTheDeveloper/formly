@@ -50,6 +50,7 @@ type FormModel interface {
 	GetByName(name string) (Form, error)
 	GetByID(id int64) (Form, error)
 	GetAll() ([]Form, error)
+	DeleteByName(name string) error
 }
 
 // ErrInvalidLengthName ...
