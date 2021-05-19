@@ -124,6 +124,7 @@ func (cmd *command) parse() error {
 // execute submits the form and creates a submission and all entries. All entries with empty text are not submitted
 func (cmd *command) submit(env *ksat.Env) error {
 	submission, err := env.SubmissionModel.Create(cmd.formID)
+	fmt.Println(fmt.Sprintf("\nsubmission(%v) time:%v", submission.GetID(), submission.GetCreateAt()))
 	if err != nil {
 		return err
 	}
@@ -132,15 +133,18 @@ func (cmd *command) submit(env *ksat.Env) error {
 			continue
 		}
 		for _, arg := range strings.Split(flag.arg, cmd.flagArgSeperator) {
-			_, err := env.EntryModel.Create(submission.GetID(), flag.labelID, arg)
+			entry, err := env.EntryModel.Create(submission.GetID(), flag.labelID, arg)
 			if err != nil {
 				return err
 			}
+			fmt.Println(fmt.Sprintf("\t%s: %s", flag.name, entry.GetTxt()))
 		}
 	}
+	fmt.Print("\n")
 	return nil
 }
 
+// creates a new form as a subcommand. If the labels flag is empty, creates it without labels
 func create(cmd *command, env *ksat.Env) error {
 	type jsonLabel struct {
 		Repeatable  bool // `json:"omitempty"`
@@ -149,29 +153,39 @@ func create(cmd *command, env *ksat.Env) error {
 
 	// validate form
 	if err := ksat.ValidateName(cmd.flags[0].arg); err != nil {
-		fmt.Println("err:" + cmd.flags[0].arg + "'")
+		fmt.Println("create:" + cmd.flags[0].arg + "'")
 		return err
 	}
 	if err := ksat.ValidateUsage(cmd.flags[1].arg); err != nil {
-		fmt.Println("err:", cmd.flags[1].arg)
+		fmt.Println("create:", cmd.flags[1].arg)
 		return err
 	}
 
 	// validate labels
 	var labels []jsonLabel
-	if err := json.Unmarshal([]byte(cmd.flags[2].arg), &labels); err != nil {
-		return err
+	if cmd.flags[2].arg != "" {
+		if err := json.Unmarshal([]byte(cmd.flags[2].arg), &labels); err != nil {
+			return err
+		}
 	}
+	names := map[string]bool{}
 	for _, label := range labels {
 		if err := ksat.ValidateName(label.Name); err != nil {
-			fmt.Println("lerr:", label.Name)
+			fmt.Println("create:label:", label.Name)
 			return err
 		}
 		if err := ksat.ValidateUsage(label.Usage); err != nil {
-			fmt.Println("lerr:", label.Usage)
+			fmt.Println("create:label", label.Usage)
 			return err
 		}
+		if _, ok := names[label.Name]; !ok {
+			names[label.Name] = true
+		} else {
+			fmt.Println("create:label:duplicate name not allowed", label.Usage)
+			return fmt.Errorf("name '%s' was used in at least two seperate labels objects", label.Name)
+		}
 	}
+
 	// create form and label
 	form, err := env.FormModel.Create(cmd.flags[0].arg, cmd.flags[1].arg)
 	if err != nil {
@@ -185,9 +199,10 @@ func create(cmd *command, env *ksat.Env) error {
 	return nil
 }
 
+// reads a form's entries. Ensure that form name passed in is valid.
 func read(cmd *command, env *ksat.Env) error {
 	if err := ksat.ValidateName(cmd.flags[0].arg); err != nil {
-		fmt.Println("err:" + cmd.flags[0].arg)
+		fmt.Println("read:" + cmd.flags[0].arg)
 		return err
 	}
 	form, err := env.FormModel.GetByName(cmd.flags[0].arg)

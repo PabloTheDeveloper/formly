@@ -21,7 +21,7 @@ func NewLocalSqLiteEnv() (*Env, error) {
 			form_id INTEGER PRIMARY KEY AUTOINCREMENT,
 			editable BOOL DEFAULT TRUE,
 			deleteable BOOL DEFAULT TRUE,
-			name TEXT NOT NULL CHECK(length(name) >= 1 AND length(name) <= 16),
+			name TEXT UNIQUE NOT NULL CHECK(length(name) >= 1 AND length(name) <= 16),
 			usage TEXT NOT NULL CHECK(length(usage) >= 5 AND length(usage) <= 252)
 		);
 
