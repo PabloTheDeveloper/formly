@@ -1,4 +1,4 @@
-module github.com/pablothedeveloper/ksat
+module github.com/pablothedeveloper/formly
 
 go 1.16
 

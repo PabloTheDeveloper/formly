@@ -1,4 +1,4 @@
-package ksat
+package formly
 
 import (
 	"database/sql"
@@ -53,38 +53,6 @@ func NewLocalSqLiteEnv() (*Env, error) {
 			FOREIGN KEY (label_id) REFERENCES labels (label_id) ON UPDATE CASCADE ON DELETE CASCADE,
 			FOREIGN KEY (submission_id) REFERENCES submissions (submission_id) ON UPDATE CASCADE ON DELETE CASCADE
 		);
-
-		INSERT INTO forms(editable, deleteable, name, usage)
-		SELECT FALSE, FALSE, 'new', 'subcommand to create other forms'
-		WHERE NOT EXISTS(SELECT 1 FROM forms WHERE name = 'new');
-
-		INSERT INTO labels(form_id, position, editable, deleteable, name, usage)
-		SELECT 1, 1, FALSE, FALSE, 'name', 'what the new form name will be'
-		WHERE NOT EXISTS(SELECT 1 FROM labels WHERE label_id = 1);
-
-		INSERT INTO labels(form_id, position, editable, deleteable, name, usage)
-		SELECT 1, 2, FALSE, FALSE, 'usage', 'what the new form usage will be'
-		WHERE NOT EXISTS(SELECT 1 FROM labels WHERE label_id = 2);
-
-		INSERT INTO labels(form_id, position, editable, deleteable, name, usage)
-		SELECT 1, 3, FALSE, FALSE, 'labels', ' what the new labels will be. requiring this str format: [{name:newName, usage:newUsage, repeatable:1_Or_0_default_is_0}, {...}, ...]'
-		WHERE NOT EXISTS(SELECT 1 FROM labels WHERE label_id = 3);
-
-		INSERT INTO forms(editable, deleteable, name, usage)
-		SELECT FALSE, FALSE, 'view', 'subcommand to read form entries'
-		WHERE NOT EXISTS(SELECT 1 FROM forms WHERE name = 'view');
-
-		INSERT INTO labels(form_id, position, editable, deleteable, name, usage)
-		SELECT 2, 1, FALSE, FALSE, 'name', 'what the new form name will be'
-		WHERE NOT EXISTS(SELECT 1 FROM labels WHERE label_id = 4);
-
-		INSERT INTO forms(editable, deleteable, name, usage)
-		SELECT FALSE, FALSE, 'remove', 'subcommand to delete form, its labels, and entries'
-		WHERE NOT EXISTS(SELECT 1 FROM forms WHERE name = 'remove');
-
-		INSERT INTO labels(form_id, position, editable, deleteable, name, usage)
-		SELECT 3, 1, FALSE, FALSE, 'name', 'which form to delete'
-		WHERE NOT EXISTS(SELECT 1 FROM labels WHERE label_id = 5);
 		`
 	/*
 
@@ -94,7 +62,7 @@ func NewLocalSqLiteEnv() (*Env, error) {
 	if err != nil {
 		return nil, err
 	}
-	dataPath := filepath.Join(homePath, ".local", "share", "ksat")
+	dataPath := filepath.Join(homePath, ".local", "share", "formly")
 	if err := os.MkdirAll(dataPath, os.ModePerm); err != nil {
 		return nil, err
 	}
