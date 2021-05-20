@@ -262,6 +262,124 @@ func removeForm(cmd *command, env *ksat.Env) error {
 	return nil
 }
 
+/*
+func updateForm(cmd *command, env *ksat.Env) error {
+	// ONLY ACCEPT ONE FLAG
+
+	// update form
+	type jsonLabel struct {
+		id         int64
+		Name    string
+		Usage      string
+		Repeatable bool
+	}
+	type jsonForm struct {
+		Name, NewUsage, NewName string
+		UpdateLabel jsonLabel
+		DeleteLabels    []jsonLabel
+	}
+	var jform jsonForm
+	if cmd.flags[0].arg == "" {
+		return errors.New("nothing passed into form flag for update command")
+	}
+	if err := json.Unmarshal([]byte(cmd.flags[0].arg), &jform); err != nil {
+		return err
+	}
+	// validate the update of the form
+	var formID int64
+	if jform.Name != "" {
+		form, err := env.FormModel.GetByName(jform.Name)
+		if err != nil {
+			return err
+		}
+		if form == (ksat.Form{}) {
+			return errors.New("form name does not exists")
+		}
+		if jform.NewName != "" {
+			jform.NewName = form.GetName()
+		}
+		if jform.NewUsage != "" {
+			jform.NewUsage = form.GetUsage()
+		}
+		formID = form.GetID()
+	}
+	if err := ksat.ValidateName(jform.NewName); err != nil {
+		fmt.Println("form newName isn't valid")
+		return err
+	}
+	if err := ksat.ValidateUsage(jform.NewUsage); err != nil {
+		fmt.Println("form newUsage isn't valid")
+		return err
+	}
+	if formID == 0 {
+		form, err := env.FormModel.Create(jform.NewName, jform.NewUsage)
+		if err != nil {
+			return err
+		}
+		formID = form.GetID()
+	} else {
+		// TODO env.FormModel.Update(form.GetID(), jform.NewName, jform.NewUsage)
+	}
+	if len(jform.DeleteLabels) == 0 && jform.UpdateLabel {
+		return nil
+	}
+	if len(jform.DeleteLabels) != 0 && len(jform.UpdateLabels) != 0 {
+		return errors.New("you can only pick either to delete labels or update labels")
+	}
+	if len(jform.DeleteLabels) != 0 {
+		names := map[string]bool{}
+		for _, label := range jform.DeleteLabels {
+			if err := ksat.ValidateName(label.Name); err != nil {
+				fmt.Println("a label called '"+label.Name+"'")
+				return err
+			}
+			if _, ok := names[label.Name]; ok {
+				return errors.New("duplicated name for labels in deleteLabels")
+			}
+			names[label.Name] = true
+		}
+		// TODO delete label env.LabelModel
+		return nil
+	}
+	if len(jform.UpdateLabels) != 0 {
+		names := map[string]bool{}
+		for _, label := range jform.UpdateLabels {
+			if err := ksat.ValidateName(label.Name); err != nil {
+				fmt.Println("a label called '"+label.Name+"'")
+				return err
+			}
+			if _, ok := names[label.Name]; ok {
+				return errors.New("duplicated name for labels in deleteLabels")
+			}
+			names[label.Name] = true
+		}
+		for _, label := range jform.UpdateLabels {
+			if err := ksat.ValidateName(label.Name); err != nil {
+				fmt.Println("a label called '"+label.Name+"'")
+				return err
+			}
+			if _, ok := names[label.Name]; ok {
+				return errors.New("duplicated name for labels in deleteLabels")
+			}
+			names[label.Name] = true
+		}
+	}
+
+	// check if form name != "", if so, do below, otherwise try to create a new form (will do in the update)
+		// check if form name is valid
+		// check if form name exist
+		// assign usage of form to usage of jform if NewUsage was empty
+		// assign name of form to name of jform if NewName was empty
+
+	// check if form new name is valid (does not already exists)
+	// check if form new name is valid (syntax)
+	// check if form newUsage is valid
+
+	// get all labels for form
+	// for each label attempted to be update, called jlabels,  we will do the following
+}
+*/
+
 // main program
 func main() {
 	env, err := ksat.NewLocalSqLiteEnv()
