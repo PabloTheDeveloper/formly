@@ -1,9 +1,10 @@
-# Ksat
-Ksat is a cli application for getting tasks done.
+# formly
+Formly is a cli application for setting up custom forms on the terminal.
+It provided a data level api for you to use in your own programs.
 
 
 ## Installation
-No current way of installing.
+Download golang. Install with golang.
 
 
 ## License
