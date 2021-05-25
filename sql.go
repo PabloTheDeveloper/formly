@@ -54,10 +54,6 @@ func NewLocalSqLiteEnv() (*Env, error) {
 			FOREIGN KEY (submission_id) REFERENCES submissions (submission_id) ON UPDATE CASCADE ON DELETE CASCADE
 		);
 		`
-	/*
-
-
-	 */
 	homePath, err := os.UserHomeDir()
 	if err != nil {
 		return nil, err
@@ -90,91 +86,75 @@ type sqlFormModel struct {
 }
 
 func (model sqlFormModel) Create(name, usage string) (Form, error) {
-	form := Form{name: name, usage: usage}
-	stmt, err := model.db.Prepare(
-		"INSERT INTO forms (name, usage) VALUES(?, ?)",
-	)
-	if err != nil {
-		return Form{}, err
-	}
-	res, err := stmt.Exec(form.name, form.usage)
-	if err != nil {
-		return Form{}, err
-	}
-	form.id, err = res.LastInsertId()
-	if err != nil {
-		return Form{}, err
-	}
-	_, err = res.RowsAffected()
-	if err != nil {
+	form := Form{Name: name, Usage: usage}
+	if err := model.db.QueryRow(
+		"INSERT INTO forms (name, usage) VALUES (?, ?) RETURNING form_id",
+		name,
+		usage,
+	).Scan(&form.ID); err != nil {
 		return Form{}, err
 	}
 	return form, nil
 }
 func (model sqlFormModel) GetByName(name string) (Form, error) {
 	form := Form{}
-	err := model.db.QueryRow(
+	if err := model.db.QueryRow(
 		"SELECT form_id, name, usage FROM forms WHERE name = ?",
 		name,
-	).Scan(&form.id, &form.name, &form.usage)
-	if err == sql.ErrNoRows {
-		err = nil
+	).Scan(&form.ID, &form.Name, &form.Usage); err != nil {
+		return Form{}, err
 	}
-	return form, err
+	return form, nil
 }
 func (model sqlFormModel) GetByID(id int64) (Form, error) {
 	form := Form{}
-	err := model.db.QueryRow(
-		"SELECT form_id, name, usage FROM forms WHERE id = ?",
+	if err := model.db.QueryRow(
+		"SELECT form_id, name, usage FROM forms WHERE form_id = ?",
 		id,
-	).Scan(&form.id, &form.name, &form.usage)
-	if err == sql.ErrNoRows {
-		err = nil
+	).Scan(&form.ID, &form.Name, &form.Usage); err != nil {
+		return Form{}, err
 	}
-	return form, err
+	return form, nil
 }
 func (model sqlFormModel) GetAll() ([]Form, error) {
 	forms := []Form{}
 	rows, err := model.db.Query("SELECT form_id, name, usage FROM forms")
 	if err != nil {
-		return forms, err
+		return nil, err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		form := Form{}
-		err := rows.Scan(&form.id, &form.name, &form.usage)
-		if err != nil {
-			return forms, err
+		if err := rows.Scan(&form.ID, &form.Name, &form.Usage); err != nil {
+			return nil, err
 		}
 		forms = append(forms, form)
 	}
-	err = rows.Err()
-	return forms, err
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return forms, nil
+}
+func (model sqlFormModel) DeleteByID(id int64) (Form, error) {
+	form, err := model.GetByID(id)
+	if err != nil {
+		return Form{}, err
+	}
+	if _, err := model.db.Exec("DELETE FROM forms WHERE form_id = ?", id); err != nil {
+		return Form{}, err
+	}
+	return form, nil
 }
 
-func (model sqlFormModel) DeleteByName(name string) error {
-	isDeletable := false
-	err := model.db.QueryRow(
-		"SELECT deleteable FROM forms WHERE name = ?",
-		name,
-	).Scan(&isDeletable)
-	if err == sql.ErrNoRows {
-		return fmt.Errorf("form '%s' is not found", name)
-	}
+func (model sqlFormModel) DeleteByName(name string) (Form, error) {
+	form, err := model.GetByName(name)
 	if err != nil {
-		return err
+		return Form{}, err
 	}
-	if !isDeletable {
-		return fmt.Errorf("form '%s' is not deletable. It is a built-in of the application", name)
+	if _, err := model.db.Exec("DELETE FROM forms WHERE name= ?", name); err != nil {
+		return Form{}, err
 	}
-	stmt, err := model.db.Prepare("DELETE FROM forms WHERE name=? AND deleteable=TRUE")
-	if err != nil {
-		return err
-	}
-	if _, err := stmt.Exec(name); err != nil {
-		return err
-	}
-	return nil
+	return form, nil
 }
 
 type sqlLabelModel struct {
@@ -182,45 +162,50 @@ type sqlLabelModel struct {
 }
 
 func (model sqlLabelModel) Create(formID, position int64, repeatable bool, name, usage string) (Label, error) {
-	label := Label{formID: formID, position: position, repeatable: repeatable, name: name, usage: usage}
-	stmt, err := model.db.Prepare(
-		"INSERT INTO labels (form_id, position, repeatable, name, usage) VALUES(?, ?, ?, ?, ?)",
-	)
-	if err != nil {
+	formModel := sqlFormModel{db: model.db}
+	if _, err := formModel.GetByID(formID); err != nil {
 		return Label{}, err
 	}
-	res, err := stmt.Exec(label.formID, label.position, label.repeatable, label.name, label.usage)
-	if err != nil {
+	label := Label{FormID: formID, Position: position, Name: name, Usage: usage}
+	if err := model.db.QueryRow(
+		"INSERT INTO labels (form_ID, position, repeatable, Name, Usage) VALUES (?, ?, ?, ?, ?) RETURNING label_id",
+		formID,
+		position,
+		repeatable,
+		name,
+		usage,
+	).Scan(&label.ID); err != nil {
 		return Label{}, err
 	}
-	label.id, err = res.LastInsertId()
-	if err != nil {
-		return Label{}, err
-	}
-	_, err = res.RowsAffected()
-	if err != nil {
-		return Label{}, err
-	}
-	return label, nil
+	return Label{FormID: formID, Position: position, Repeatable: repeatable, Name: name, Usage: usage}, nil
 }
 
 func (model sqlLabelModel) GetLabels(formID int64) ([]Label, error) {
+	formModel := sqlFormModel{db: model.db}
+	if form, err := formModel.GetByID(formID); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("form '%s' does not exists", form.Name)
+		}
+		return nil, err
+	}
 	labels := []Label{}
-	rows, err := model.db.Query("SELECT label_id, position, repeatable, name, usage FROM labels WHERE form_id = ? ORDER BY position ASC", formID)
+	rows, err := model.db.Query(
+		"SELECT label_id, position, repeatable, name, usage FROM labels WHERE form_id = ? ORDER BY position ASC", formID)
 	if err != nil {
-		return labels, err
+		return nil, err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		label := Label{}
-		err := rows.Scan(&label.id, &label.position, &label.repeatable, &label.name, &label.usage)
-		if err != nil {
-			return labels, err
+		if err := rows.Scan(&label.ID, &label.Position, &label.Repeatable, &label.Name, &label.Usage); err != nil {
+			return nil, err
 		}
 		labels = append(labels, label)
 	}
-	err = rows.Err()
-	return labels, err
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return labels, nil
 }
 
 type sqlSubmissionModel struct {
@@ -228,50 +213,50 @@ type sqlSubmissionModel struct {
 }
 
 func (model sqlSubmissionModel) Create(formID int64) (Submission, error) {
-	submission := Submission{formID: formID}
-	stmt, err := model.db.Prepare("INSERT INTO submissions (form_id) VALUES(?)")
-	if err != nil {
+	formModel := sqlFormModel{db: model.db}
+	if form, err := formModel.GetByID(formID); err != nil {
+		if err == sql.ErrNoRows {
+			return Submission{}, fmt.Errorf("form '%s' does not exists", form.Name)
+		}
 		return Submission{}, err
 	}
-	res, err := stmt.Exec(submission.formID)
-	if err != nil {
-		return Submission{}, err
-	}
-	submission.id, err = res.LastInsertId()
-	if err != nil {
-		return Submission{}, err
-	}
-	_, err = res.RowsAffected()
-	if err != nil {
-		return Submission{}, err
-	}
+	submission := Submission{FormID: formID}
 	if err := model.db.QueryRow(
-		"SELECT created_at FROM submissions WHERE submission_id = ?",
-		submission.id,
-	).Scan(&submission.createAt); err != nil {
+		"INSERT INTO submissions (form_id) VALUES (?) RETURNING submission_id",
+		formID,
+	).Scan(&submission.ID); err != nil {
 		return Submission{}, err
 	}
 	return submission, nil
 }
 func (model sqlSubmissionModel) GetSubmissions(formID int64) ([]Submission, error) {
+	formModel := sqlFormModel{db: model.db}
+	if form, err := formModel.GetByID(formID); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("form '%s' does not exists", form.Name)
+		}
+		return nil, err
+	}
 	submissions := []Submission{}
 	rows, err := model.db.Query(
 		"SELECT submission_id, form_id, created_at FROM submissions WHERE form_id = ? ORDER BY created_at ASC",
 		formID,
 	)
 	if err != nil {
-		return submissions, err
+		return nil, err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		submission := Submission{}
-		err := rows.Scan(&submission.id, &submission.formID, &submission.createAt)
+		err := rows.Scan(&submission.ID, &submission.FormID, &submission.CreateAt)
 		if err != nil {
-			return submissions, err
+			return nil, err
 		}
 		submissions = append(submissions, submission)
 	}
-	err = rows.Err()
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
 	return submissions, err
 }
 
@@ -280,21 +265,13 @@ type sqlEntryModel struct {
 }
 
 func (model sqlEntryModel) Create(submissionID, labelID int64, txt string) (Entry, error) {
-	entry := Entry{labelID: labelID, submissionID: submissionID, txt: txt}
-	stmt, err := model.db.Prepare("INSERT INTO entries (label_id, submission_id, txt) VALUES (?, ?, ?)")
-	if err != nil {
-		return Entry{}, err
-	}
-	res, err := stmt.Exec(entry.labelID, entry.submissionID, entry.txt)
-	if err != nil {
-		return Entry{}, err
-	}
-	entry.id, err = res.LastInsertId()
-	if err != nil {
-		return Entry{}, err
-	}
-	_, err = res.RowsAffected()
-	if err != nil {
+	entry := Entry{LabelID: labelID, SubmissionID: submissionID, Txt: txt}
+	if err := model.db.QueryRow(
+		"INSERT INTO entries (label_id, submission_id, txt) VALUES (?, ?, ?) RETURNING entry_id",
+		labelID,
+		submissionID,
+		txt,
+	).Scan(&entry.ID); err != nil {
 		return Entry{}, err
 	}
 	return entry, nil
@@ -303,20 +280,19 @@ func (model sqlEntryModel) Create(submissionID, labelID int64, txt string) (Entr
 func (model sqlEntryModel) GetEntries(submissionID, labelID int64) ([]Entry, error) {
 	entries := []Entry{}
 	rows, err := model.db.Query(
-		`SELECT entry_id, submission_id, label_id, txt
-		FROM entries WHERE submission_id = ? AND label_id = ?`,
+		`SELECT entry_id, submission_id, label_id, txt FROM entries WHERE submission_id = ? AND label_id = ?`,
 		submissionID,
 		labelID,
 	)
 	if err != nil {
-		return entries, err
+		return nil, err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		entry := Entry{}
-		err := rows.Scan(&entry.id, &entry.submissionID, &entry.labelID, &entry.txt)
+		err := rows.Scan(&entry.ID, &entry.SubmissionID, &entry.LabelID, &entry.Txt)
 		if err != nil {
-			return entries, err
+			return nil, err
 		}
 		entries = append(entries, entry)
 	}
