@@ -51,7 +51,7 @@ type Label struct {
 type LabelModel interface {
 	Create(formID, position int64, repeatable bool, name, usage string) (Label, error)
 	GetLabels(formID int64) ([]Label, error)
-	Update(labelID int64, name, usage string) (Label, error)
+	Update(formID, labelID, position int64, repeatable bool, name, usage string) ([]Label, error)
 }
 
 // Submission ...

@@ -220,16 +220,56 @@ func (model sqlLabelModel) GetLabels(formID int64) ([]Label, error) {
 	return labels, nil
 }
 
-func (model sqlLabelModel) Update(labelID int64, name, usage string) (Label, error) {
+func (model sqlLabelModel) Update(formID, labelID, position int64, repeatable bool, name, usage string) ([]Label, error) {
+	labels, err := model.GetLabels(formID)
+	if err != nil {
+		return nil, err
+	}
+	if int(position) > len(labels) || int(position) < 1 {
+		return nil, fmt.Errorf("position has to be in range between: %v - %v", 1, len(labels))
+	}
+	// check that only name matches with the label with the same labelID
+	var updatingLabel Label
+	var swapLabel Label
+	for _, label := range labels {
+		if label.ID == labelID {
+			updatingLabel = label
+		}
+		if label.ID != labelID && label.Name == name {
+			return nil, fmt.Errorf("suggested new label name '%s' already exists", name)
+		}
+		if label.Position == position {
+			swapLabel = label
+		}
+	}
 	if _, err := model.db.Exec(
-		"UPDATE labels SET name = ?, usage = ? WHERE label_id = ? ",
+		"UPDATE labels SET name = ?, usage = ?, repeatable = ?, position = ? WHERE label_id = ? ",
 		name,
 		usage,
+		repeatable,
+		position,
 		labelID,
 	); err != nil {
-		return Label{}, err
+		return nil, err
 	}
-	return Label{ID: labelID, Name: name, Usage: usage}, nil
+	swapLabel.Position = updatingLabel.Position
+	updatingLabel.Name = name
+	updatingLabel.Usage = usage
+	updatingLabel.Repeatable = repeatable
+	if swapLabel.ID == updatingLabel.ID {
+		updatingLabel.Position = position
+		return []Label{updatingLabel}, nil
+	}
+	if _, err := model.db.Exec(
+		"UPDATE labels SET position = ? WHERE label_id = ? ",
+		swapLabel.Position,
+		swapLabel.ID,
+	); err != nil {
+		return nil, err
+	}
+
+	updatingLabel.Position = position
+	return []Label{updatingLabel, swapLabel}, nil
 }
 
 type sqlSubmissionModel struct {

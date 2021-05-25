@@ -49,8 +49,8 @@ func main() {
 			fmt.Println("usage: form submissions <form-name>")
 		case "modify":
 			fmt.Println(
-				"usage: form modify <form-name> [--newName] [--newUsage]" +
-					"<label-name> [--newName] [--newUsage]",
+				"usage: form modify <form-name> [--name] [--usage]" +
+					"<label-name> [--name] [--usage]",
 			)
 		default:
 			flag.CommandLine.Usage()
@@ -157,8 +157,10 @@ func main() {
 		subsubcmd := flag.NewFlagSet(subcmd.fs.Arg(0), flag.ExitOnError)
 		newLabelName := subsubcmd.String("name", subcmd.labels[found].Name, "new name for label")
 		newLabelUsage := subsubcmd.String("usage", subcmd.labels[found].Usage, "new usage for label")
+		position := subsubcmd.Int64("position", subcmd.labels[found].Position, "new position for label")
+		repeatable := subsubcmd.Bool("repeatable", false, "whether label repeats")
 		subsubcmd.Parse(subcmd.fs.Args()[1:])
-		if err := modifylabel(env, subcmd.labels[found].ID, *newLabelName, *newLabelUsage); err != nil {
+		if err := modifylabel(env, subcmd.form.ID, subcmd.labels[found].ID, *position, *repeatable, *newLabelName, *newLabelUsage); err != nil {
 			fmt.Println(err)
 			return
 		}
@@ -344,11 +346,11 @@ func modify(env *formly.Env, formID int64, newName, newUsage string) error {
 	fmt.Printf("updated form: %v\n", form)
 	return nil
 }
-func modifylabel(env *formly.Env, labelID int64, newName, newUsage string) error {
-	form, err := env.LabelModel.Update(labelID, newName, newUsage)
+func modifylabel(env *formly.Env, formID, labelID, position int64, repeatable bool, newName, newUsage string) error {
+	labels, err := env.LabelModel.Update(formID, labelID, position, repeatable, newName, newUsage)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("updated label: %v\n", form)
+	fmt.Printf("updated label(s): %v\n", labels)
 	return nil
 }
