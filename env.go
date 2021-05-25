@@ -37,6 +37,7 @@ type FormModel interface {
 	GetAll() ([]Form, error)
 	DeleteByID(id int64) (Form, error)
 	DeleteByName(name string) (Form, error)
+	Update(formID int64, name, usage string) (Form, error)
 }
 
 // Label ...
@@ -50,6 +51,7 @@ type Label struct {
 type LabelModel interface {
 	Create(formID, position int64, repeatable bool, name, usage string) (Label, error)
 	GetLabels(formID int64) ([]Label, error)
+	Update(labelID int64, name, usage string) (Label, error)
 }
 
 // Submission ...

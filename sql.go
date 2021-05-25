@@ -157,6 +157,18 @@ func (model sqlFormModel) DeleteByName(name string) (Form, error) {
 	return form, nil
 }
 
+func (model sqlFormModel) Update(formID int64, name, usage string) (Form, error) {
+	if _, err := model.db.Exec(
+		"UPDATE forms SET name = ?, usage = ? WHERE form_id = ?",
+		name,
+		usage,
+		formID,
+	); err != nil {
+		return Form{}, err
+	}
+	return Form{ID: formID, Name: name, Usage: usage}, nil
+}
+
 type sqlLabelModel struct {
 	db *sql.DB
 }
@@ -206,6 +218,18 @@ func (model sqlLabelModel) GetLabels(formID int64) ([]Label, error) {
 		return nil, err
 	}
 	return labels, nil
+}
+
+func (model sqlLabelModel) Update(labelID int64, name, usage string) (Label, error) {
+	if _, err := model.db.Exec(
+		"UPDATE labels SET name = ?, usage = ? WHERE label_id = ? ",
+		name,
+		usage,
+		labelID,
+	); err != nil {
+		return Label{}, err
+	}
+	return Label{ID: labelID, Name: name, Usage: usage}, nil
 }
 
 type sqlSubmissionModel struct {

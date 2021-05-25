@@ -42,11 +42,16 @@ func main() {
 		case "delete":
 			fmt.Println("usage: form delete <form-name>")
 		case "label":
-			fmt.Println("usage: form label <form-name> [--position] [--repeatable] <label-name> <label-usage>")
+			fmt.Println("usage: form label <form-name> [--repeatable] <label-name> <label-usage>")
 		case "submit":
 			fmt.Println("usage: form submit <form-name>")
 		case "submissions":
 			fmt.Println("usage: form submissions <form-name>")
+		case "modify":
+			fmt.Println(
+				"usage: form modify <form-name> [--newName] [--newUsage]" +
+					"<label-name> [--newName] [--newUsage]",
+			)
 		default:
 			flag.CommandLine.Usage()
 		}
@@ -77,7 +82,6 @@ func main() {
 			fmt.Println(err)
 			return
 		}
-		position := subcmd.fs.Int64("position", int64(len(subcmd.labels)+1), "what position other than last for label")
 		repeatable := subcmd.fs.Bool("repeatable", false, "whether label repeats")
 		subcmd.parse()
 		name := subcmd.fs.Arg(0)
@@ -87,7 +91,7 @@ func main() {
 			cmd.Usage()
 			return
 		}
-		if err := label(env, subcmd.form.ID, *position, *repeatable, name, usage); err != nil {
+		if err := label(env, subcmd.form.ID, int64(len(subcmd.labels)+1), *repeatable, name, usage); err != nil {
 			fmt.Println(err)
 		}
 	case "review":
@@ -122,6 +126,42 @@ func main() {
 		if err := submissions(env, subcmd.form.ID); err != nil {
 			fmt.Println(err)
 		}
+	case "modify":
+		subcmd, err := newSubCommand(env, cmd, cmd.Args()...)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		newName := subcmd.fs.String("name", subcmd.form.Name, "new name for form")
+		newUsage := subcmd.fs.String("usage", subcmd.form.Usage, "new usage for form")
+		subcmd.parse()
+
+		if err := modify(env, subcmd.form.ID, *newName, *newUsage); err != nil {
+			fmt.Println(err)
+			return
+		}
+		if subcmd.fs.NArg() == 0 {
+			return
+		}
+		found := -1
+		for i, label := range subcmd.labels {
+			if label.Name == subcmd.fs.Arg(0) {
+				found = i
+				break
+			}
+		}
+		if found == -1 {
+			fmt.Printf("label '%s' for form '%s' not found\n", subcmd.fs.Arg(0), subcmd.fs.Name())
+			return
+		}
+		subsubcmd := flag.NewFlagSet(subcmd.fs.Arg(0), flag.ExitOnError)
+		newLabelName := subsubcmd.String("name", subcmd.labels[found].Name, "new name for label")
+		newLabelUsage := subsubcmd.String("usage", subcmd.labels[found].Usage, "new usage for label")
+		subsubcmd.Parse(subcmd.fs.Args()[1:])
+		if err := modifylabel(env, subcmd.labels[found].ID, *newLabelName, *newLabelUsage); err != nil {
+			fmt.Println(err)
+			return
+		}
 	case "":
 		fmt.Println("No command passed in")
 	default:
@@ -146,7 +186,7 @@ type formFlag struct {
 
 func newSubCommand(env *formly.Env, cmd *flag.FlagSet, args ...string) (scmd subcommand, err error) {
 	if cmd.NArg() == 0 && cmd.NFlag() == 0 {
-		err = fmt.Errorf("default behavior for cmd...done!")
+		err = fmt.Errorf("default behavior for cmd...done")
 		return
 	}
 	scmd.form, err = env.FormModel.GetByName(args[0])
@@ -294,5 +334,21 @@ func submissions(env *formly.Env, formID int64) error {
 			}
 		}
 	}
+	return nil
+}
+func modify(env *formly.Env, formID int64, newName, newUsage string) error {
+	form, err := env.FormModel.Update(formID, newName, newUsage)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("updated form: %v\n", form)
+	return nil
+}
+func modifylabel(env *formly.Env, labelID int64, newName, newUsage string) error {
+	form, err := env.LabelModel.Update(labelID, newName, newUsage)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("updated label: %v\n", form)
 	return nil
 }
