@@ -29,6 +29,19 @@ func main() {
 			"  submit\t- submits an existing form\n" +
 			"  submissions\t- views prior submissions of a form\n" +
 			"  modify\t- modifies a form or a form's label")
+
+		forms, err := env.FormModel.GetAll()
+		if err != nil {
+			log.Fatal("main:", err)
+		}
+
+		fmt.Println("\nform usage: form submit <form-name> <...form-labels-as-flags>")
+		if len(forms) == 0 {
+			return
+		}
+		for _, form := range forms {
+			fmt.Printf("  %s\t\t- %s\n", form.Name, form.Usage)
+		}
 	}
 	flag.Parse()
 	if flag.NArg() == 0 && flag.NFlag() == 0 {
@@ -219,6 +232,17 @@ func newSubCommand(env *formly.Env, cmd *flag.FlagSet, args ...string) (scmd sub
 	scmd.fs = flag.NewFlagSet(args[0], flag.ExitOnError)
 	scmd.unParsedArgs = args[1:]
 	scmd.repeatableArgSeperator = ",/"
+
+	scmd.fs.Usage = func() {
+		usageFlagStr := []string{}
+		for _, label := range scmd.labels {
+			usageFlagStr = append(usageFlagStr, "[--"+label.Name+"]")
+		}
+		fmt.Printf("\nusage: form submit %s %s\n", scmd.form.Name, strings.Join(usageFlagStr, " "))
+		for _, label := range scmd.labels {
+			fmt.Printf("  %s\t\t- %s\n", label.Name, label.Usage)
+		}
+	}
 	return
 }
 
@@ -324,7 +348,9 @@ func delete(env *formly.Env, formID, labelID int64) error {
 	return nil
 }
 func label(env *formly.Env, formID, position int64, repeatable bool, name, usage string) error {
-	fmt.Println("trying to add label...")
+	if name == "h" || name == "-h" || strings.Contains(name, "help") {
+		return errors.New("label name cannot be 'h' or or '-h' or contain 'help'")
+	}
 	label, err := env.LabelModel.Create(formID, position, repeatable, name, usage)
 	if err != nil {
 		return err
@@ -371,6 +397,9 @@ func modify(env *formly.Env, formID int64, newName, newUsage string) error {
 	return nil
 }
 func modifylabel(env *formly.Env, formID, labelID, position int64, repeatable bool, newName, newUsage string) error {
+	if newName == "h" || newName == "-h" || strings.Contains(newName, "help") {
+		return errors.New("label name cannot be 'h' or or '-h' or contain 'help'")
+	}
 	labels, err := env.LabelModel.Update(formID, labelID, position, repeatable, newName, newUsage)
 	if err != nil {
 		return err
