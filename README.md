@@ -1,10 +1,16 @@
+
 # formly
-Formly is a cli application for setting up custom forms on the terminal.
-It provided a data level api for you to use in your own programs.
+Is a CLI application for setting up basic forms on the terminal.
+Any feedback on the code or usage of the app can be submitted to pablothedeveloper@gmail.com.
+
+## Demo
+![asciicast](https://asciinema.org/a/416497.svg)](https://asciinema.org/a/416497)
 
 ## Installation
-Download golang.
-Install with golang.
-
+### w/ Golang:
+```
+go get -u github.com/pablothedeveloper/formly/cmd/form
+```
 ## License
 [MIT](LICENSE)
+
