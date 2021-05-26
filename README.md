@@ -4,7 +4,7 @@ Is a CLI application for setting up basic forms on the terminal.
 Any feedback on the code or usage of the app can be submitted to pablothedeveloper@gmail.com.
 
 ## Demo
-[![asciicast](https://asciinema.org/a/14.png)](https://asciinema.org/a/14)
+[![asciicast](https://asciinema.org/a/416497.svg)](https://asciinema.org/a/416497)
 
 ## Installation
 ### w/ Golang:
