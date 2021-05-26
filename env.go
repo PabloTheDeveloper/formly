@@ -52,6 +52,7 @@ type LabelModel interface {
 	Create(formID, position int64, repeatable bool, name, usage string) (Label, error)
 	GetLabels(formID int64) ([]Label, error)
 	Update(formID, labelID, position int64, repeatable bool, name, usage string) ([]Label, error)
+	DeleteByID(id int64) (Label, error)
 }
 
 // Submission ...

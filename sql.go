@@ -180,7 +180,7 @@ func (model sqlLabelModel) Create(formID, position int64, repeatable bool, name,
 	}
 	label := Label{FormID: formID, Position: position, Name: name, Usage: usage}
 	if err := model.db.QueryRow(
-		"INSERT INTO labels (form_ID, position, repeatable, Name, Usage) VALUES (?, ?, ?, ?, ?) RETURNING label_id",
+		"INSERT INTO labels (form_id, position, repeatable, Name, Usage) VALUES (?, ?, ?, ?, ?) RETURNING label_id",
 		formID,
 		position,
 		repeatable,
@@ -191,25 +191,34 @@ func (model sqlLabelModel) Create(formID, position int64, repeatable bool, name,
 	}
 	return Label{FormID: formID, Position: position, Repeatable: repeatable, Name: name, Usage: usage}, nil
 }
-
+func (model sqlLabelModel) GetByID(id int64) (Label, error) {
+	label := Label{}
+	if err := model.db.QueryRow(
+		"SELECT label_id, form_id, name, usage, position, repeatable FROM labels WHERE label_id = ?",
+		id,
+	).Scan(&label.ID, &label.FormID, &label.Name, &label.Usage, &label.Position, &label.Repeatable); err != nil {
+		return Label{}, err
+	}
+	return label, nil
+}
 func (model sqlLabelModel) GetLabels(formID int64) ([]Label, error) {
 	formModel := sqlFormModel{db: model.db}
-	if form, err := formModel.GetByID(formID); err != nil {
+	if _, err := formModel.GetByID(formID); err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("form '%s' does not exists", form.Name)
+			return nil, fmt.Errorf("GetLabels: form with form_id: %v does not exists", formID)
 		}
 		return nil, err
 	}
 	labels := []Label{}
 	rows, err := model.db.Query(
-		"SELECT label_id, position, repeatable, name, usage FROM labels WHERE form_id = ? ORDER BY position ASC", formID)
+		"SELECT label_id, form_id, position, repeatable, name, usage FROM labels WHERE form_id = ? ORDER BY position ASC", formID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		label := Label{}
-		if err := rows.Scan(&label.ID, &label.Position, &label.Repeatable, &label.Name, &label.Usage); err != nil {
+		if err := rows.Scan(&label.ID, &label.FormID, &label.Position, &label.Repeatable, &label.Name, &label.Usage); err != nil {
 			return nil, err
 		}
 		labels = append(labels, label)
@@ -219,7 +228,6 @@ func (model sqlLabelModel) GetLabels(formID int64) ([]Label, error) {
 	}
 	return labels, nil
 }
-
 func (model sqlLabelModel) Update(formID, labelID, position int64, repeatable bool, name, usage string) ([]Label, error) {
 	labels, err := model.GetLabels(formID)
 	if err != nil {
@@ -256,7 +264,7 @@ func (model sqlLabelModel) Update(formID, labelID, position int64, repeatable bo
 	updatingLabel.Name = name
 	updatingLabel.Usage = usage
 	updatingLabel.Repeatable = repeatable
-	if swapLabel.ID == updatingLabel.ID {
+	if swapLabel.ID == updatingLabel.ID || swapLabel == (Label{}) {
 		updatingLabel.Position = position
 		return []Label{updatingLabel}, nil
 	}
@@ -271,6 +279,32 @@ func (model sqlLabelModel) Update(formID, labelID, position int64, repeatable bo
 	updatingLabel.Position = position
 	return []Label{updatingLabel, swapLabel}, nil
 }
+func (model sqlLabelModel) DeleteByID(id int64) (Label, error) {
+	label, err := model.GetByID(id)
+	if err != nil {
+		return Label{}, err
+	}
+	labels, err := model.GetLabels(label.FormID)
+	if err != nil {
+		return Label{}, err
+	}
+	if _, err := model.db.Exec("DELETE FROM labels WHERE label_id = ?", id); err != nil {
+		return Label{}, err
+	}
+	changePos := 0
+	for i, l := range labels {
+		if l.ID == id {
+			changePos = i
+		}
+	}
+	for _, l := range labels[changePos+1:] {
+		_, err := model.Update(l.FormID, l.ID, l.Position-1, l.Repeatable, l.Name, l.Usage)
+		if err != nil {
+			return Label{}, err
+		}
+	}
+	return label, nil
+}
 
 type sqlSubmissionModel struct {
 	db *sql.DB
@@ -278,9 +312,9 @@ type sqlSubmissionModel struct {
 
 func (model sqlSubmissionModel) Create(formID int64) (Submission, error) {
 	formModel := sqlFormModel{db: model.db}
-	if form, err := formModel.GetByID(formID); err != nil {
+	if _, err := formModel.GetByID(formID); err != nil {
 		if err == sql.ErrNoRows {
-			return Submission{}, fmt.Errorf("form '%s' does not exists", form.Name)
+			return Submission{}, fmt.Errorf("form with form_id:%v does not exists", formID)
 		}
 		return Submission{}, err
 	}
@@ -295,9 +329,9 @@ func (model sqlSubmissionModel) Create(formID int64) (Submission, error) {
 }
 func (model sqlSubmissionModel) GetSubmissions(formID int64) ([]Submission, error) {
 	formModel := sqlFormModel{db: model.db}
-	if form, err := formModel.GetByID(formID); err != nil {
+	if _, err := formModel.GetByID(formID); err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("form '%s' does not exists", form.Name)
+			return nil, fmt.Errorf("form with form_id:%v does not exists", formID)
 		}
 		return nil, err
 	}

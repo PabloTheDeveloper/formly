@@ -20,14 +20,15 @@ func main() {
 	}
 	defer env.Close()
 	flag.CommandLine.Usage = func() {
-		fmt.Println("form [--help] [command] [--help] [<args>] [<options>]")
+		fmt.Println("form [--help] [command] [--help] [<args>]")
 		fmt.Println("commands:\n" +
 			"  create\t- creates a form\n" +
 			"  delete\t- deletes an existing form\n" +
 			"  label\t\t- adds a label to an existing form\n" +
 			"  review\t- reviews content of an existing form\n" +
 			"  submit\t- submits an existing form\n" +
-			"  submissions\t- views prior submissions of a form")
+			"  submissions\t- views prior submissions of a form\n" +
+			"  modify\t- modifies a form or a form's label")
 	}
 	flag.Parse()
 	if flag.NArg() == 0 && flag.NFlag() == 0 {
@@ -40,17 +41,19 @@ func main() {
 		case "create":
 			fmt.Println("usage: form create <form-name> <form-usage>")
 		case "delete":
-			fmt.Println("usage: form delete <form-name>")
+			fmt.Println("usage: form delete <form-name> [--label]")
 		case "label":
 			fmt.Println("usage: form label <form-name> [--repeatable] <label-name> <label-usage>")
+		case "review":
+			fmt.Println("usage: form review <form-name>")
 		case "submit":
-			fmt.Println("usage: form submit <form-name>")
+			fmt.Println("usage: form submit <form-name> <...form-labels-as-flags>")
 		case "submissions":
 			fmt.Println("usage: form submissions <form-name>")
 		case "modify":
 			fmt.Println(
 				"usage: form modify <form-name> [--name] [--usage]" +
-					"<label-name> [--name] [--usage]",
+					"<label-name> [--name] [--usage] [--position] [--repeatable]",
 			)
 		default:
 			flag.CommandLine.Usage()
@@ -73,7 +76,20 @@ func main() {
 			fmt.Println(err)
 			return
 		}
-		if err := delete(env, subcmd.form.ID); err != nil {
+		labelName := subcmd.fs.String("label", "", "for deleting a specific label name")
+		subcmd.parse()
+		labelID := int64(-1)
+		for _, label := range subcmd.labels {
+			if label.Name == *labelName {
+				labelID = label.ID
+				break
+			}
+		}
+		if labelID == -1 && *labelName != "" {
+			fmt.Printf("label '%s' for form '%s' not found\n", *labelName, subcmd.fs.Name())
+			return
+		}
+		if err := delete(env, subcmd.form.ID, labelID); err != nil {
 			fmt.Println(err)
 		}
 	case "label":
@@ -158,7 +174,7 @@ func main() {
 		newLabelName := subsubcmd.String("name", subcmd.labels[found].Name, "new name for label")
 		newLabelUsage := subsubcmd.String("usage", subcmd.labels[found].Usage, "new usage for label")
 		position := subsubcmd.Int64("position", subcmd.labels[found].Position, "new position for label")
-		repeatable := subsubcmd.Bool("repeatable", false, "whether label repeats")
+		repeatable := subsubcmd.Bool("repeatable", subcmd.labels[found].Repeatable, "whether label repeats")
 		subsubcmd.Parse(subcmd.fs.Args()[1:])
 		if err := modifylabel(env, subcmd.form.ID, subcmd.labels[found].ID, *position, *repeatable, *newLabelName, *newLabelUsage); err != nil {
 			fmt.Println(err)
@@ -291,7 +307,15 @@ func create(env *formly.Env, name, usage string) error {
 	fmt.Printf("form created: %v\n", form)
 	return nil
 }
-func delete(env *formly.Env, formID int64) error {
+func delete(env *formly.Env, formID, labelID int64) error {
+	if labelID != -1 {
+		label, err := env.LabelModel.DeleteByID(labelID)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("delete label: %v\n", label)
+		return nil
+	}
 	form, err := env.FormModel.DeleteByID(formID)
 	if err != nil {
 		return err
