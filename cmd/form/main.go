@@ -13,6 +13,26 @@ import (
 	"github.com/pablothedeveloper/formly"
 )
 
+const defaultCommandUsage string = `usage: form [--help] [command] [--help] [<args>]
+description: the form cli tool create and manages forms on the terminal.
+
+commands:
+	create
+		- creates a form
+	delete
+		- deletes an existing form
+	label
+		- adds a label to an existing form
+	review
+		- reviews content of an existing form
+	submit
+		- submits an existing form
+	submissions
+		- views prior submissions of a form
+	modify
+		- modifies a form or a form's label
+`
+
 func main() {
 	env, err := formly.NewLocalSqLiteEnv()
 	if err != nil {
@@ -20,21 +40,11 @@ func main() {
 	}
 	defer env.Close()
 	flag.CommandLine.Usage = func() {
-		fmt.Println("form [--help] [command] [--help] [<args>]")
-		fmt.Println("commands:\n" +
-			"  create\t- creates a form\n" +
-			"  delete\t- deletes an existing form\n" +
-			"  label\t\t- adds a label to an existing form\n" +
-			"  review\t- reviews content of an existing form\n" +
-			"  submit\t- submits an existing form\n" +
-			"  submissions\t- views prior submissions of a form\n" +
-			"  modify\t- modifies a form or a form's label")
-
+		fmt.Println(defaultCommandUsage)
 		forms, err := env.FormModel.GetAll()
 		if err != nil {
 			log.Fatal("main:", err)
 		}
-
 		fmt.Println("\nform usage: form submit <form-name> <...form-labels-as-flags>")
 		if len(forms) == 0 {
 			return
@@ -45,7 +55,7 @@ func main() {
 	}
 	flag.Parse()
 	if flag.NArg() == 0 && flag.NFlag() == 0 {
-		fmt.Println("default behavior...done!")
+		fmt.Println(defaultCommandUsage)
 		return
 	}
 	cmd := flag.NewFlagSet(flag.Arg(0), flag.ExitOnError)
@@ -217,7 +227,7 @@ type formFlag struct {
 
 func newSubCommand(env *formly.Env, cmd *flag.FlagSet, args ...string) (scmd subcommand, err error) {
 	if cmd.NArg() == 0 && cmd.NFlag() == 0 {
-		err = fmt.Errorf("default behavior for cmd...done")
+		err = fmt.Errorf(defaultCommandUsage)
 		return
 	}
 	scmd.form, err = env.FormModel.GetByName(args[0])
